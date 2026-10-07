@@ -84,7 +84,7 @@ skip_whitespace :: proc(t: ^Tokenizer) {
 is_letter :: proc(r: rune) -> bool {
 	if r < utf8.RUNE_SELF {
 		switch r {
-		case '_':
+		case '_', '-':
 			return true
 		case 'A'..='Z', 'a'..='z':
 			return true
