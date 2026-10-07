@@ -1,6 +1,6 @@
 <odin id="root!">
   <head>
-    <link type="style" source="test.ocss" />
+    <link type="style" source="tests/test.ocss" />
   </head>
   <body>
     <rect id="url_box" class="inputbox">

@@ -159,6 +159,8 @@ next_token :: proc(t: ^Tokenizer) -> Token{
 				case ')': kind = .Close_Paren
 				case '[': kind = .Open_Bracket
 				case ']': kind = .Close_Bracket
+				case ';': kind = .Semicolon
+				case ':': kind = .Colon
 					// these need a check
 				case '.': kind = .Class
 				case '#': kind = .Id

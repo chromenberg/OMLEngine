@@ -277,7 +277,7 @@ error_handler :: proc "c" (data: clay.ErrorData) {
 }
 
 
-FONT_PATH :: ""
+FONT_PATH :: "./resources/"
 FONT_PRIMARY :: FONT_PATH + "Quicksand-Semibold.ttf"
 
 layout_engine_min_memory :: proc() -> c.size_t {

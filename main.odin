@@ -52,7 +52,7 @@ main :: proc() {
 
 	doc : oml.Document
 	doc.backing = make([]byte, 5*1024)
-	oml.parse("test.oml", &doc)
+	oml.parse("./tests/test.oml", &doc)
   defer delete(doc.backing)
   defer free_all(doc.allocator)
 
