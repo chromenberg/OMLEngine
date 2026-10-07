@@ -1,0 +1,70 @@
+[
+	Token{
+		kind = "Id",
+	},
+	Token{
+		kind = "Identifier",
+		text = "text_with_id",
+	},
+	Token{
+		kind = "Open_Brace",
+	},
+	Token{
+		kind = "Identifier",
+		text = "background",
+	},
+	Token{
+		kind = "Invalid",
+		text = "-",
+	},
+	Token{
+		kind = "Identifier",
+		text = "color",
+	},
+	Token{
+		kind = "Invalid",
+		text = ":",
+	},
+	Token{
+		kind = "Identifier",
+		text = "red",
+	},
+	Token{
+		kind = "Invalid",
+		text = ";",
+	},
+	Token{
+		kind = "Close_Brace",
+	},
+	Token{
+		kind = "Class",
+	},
+	Token{
+		kind = "Identifier",
+		text = "inputBox",
+	},
+	Token{
+		kind = "Class",
+	},
+	Token{
+		kind = "Identifier",
+		text = "anotherclass",
+	},
+	Token{
+		kind = "Class",
+	},
+	Token{
+		kind = "Identifier",
+		text = "with2requirements",
+	},
+	Token{
+		kind = "Open_Brace",
+	},
+	Token{
+		kind = "Close_Brace",
+	},
+	Token{
+		kind = "EOF",
+		text = "",
+	},
+]

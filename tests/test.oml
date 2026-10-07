@@ -1,0 +1,20 @@
+<odin id="root!">
+  <head>
+    <link type="style" source="test.ocss" />
+  </head>
+  <body>
+    <rect id="url_box" class="inputbox">
+      <text>Enter a URL</text>
+      <text id="text_with_id">Another text element in the url_box</text>
+    </rect>
+    
+    <rect>
+      <text>Text outside the nested rect</text>
+      <rect>
+
+      </rect>
+      
+    </rect>
+  </body>
+</odin>
+
