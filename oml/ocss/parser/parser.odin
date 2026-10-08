@@ -3,169 +3,254 @@ package parser
 import "base:runtime"
 import "core:fmt"
 import "core:mem"
-import tok "../tokenizer"
+
+import "../tokenizer"
+import "../ast"
+
+Warn_Handler :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any)
+Error_Handler :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any)
 
 Parser :: struct {
-	allocator  : mem.Allocator,
-	path			 : string,
-	tokenizer  : ^tok.Tokenizer,
-	lookahead  : tok.Token,
-	current 	 : tok.Token,
-	index			 : int,
-	parse_state: Parser_State,
-	states 		 : [dynamic]Rule_State,
-	state			 : Rule_State,
-	stack			 : [dynamic]tok.Token,
-	model			 : [dynamic]Structure,
-	finish     : bool `false`
+	path: string,
+	tok: tokenizer.Tokenizer,
+	
+	warn: Warn_Handler,
+	err: Error_Handler,
+	err_count: int,
+	
+	prev_token: tokenizer.Token,
+	curr_token: tokenizer.Token,
+
+	curr_func: ^ast.Node,
 }
 
-Parser_State :: enum {
-	ERROR,
-	SHIFT,
-	REDUCE,
-	STOP
+default_warn_handler :: proc(pos: tokenizer.Pos, msg: string, args: ..any) {
+  fmt.eprintf("[%d:%d] Warning:", pos.line,pos.column)
+  fmt.eprintfln(msg, ..args)
 }
 
-Rule_State :: enum {
-	In_Paren,
-	In_Brace,
-	In_Bracket,
-	In_Declaration,
-	In_Property,
+default_err_handler :: proc(pos: tokenizer.Pos, msg: string, args: ..any) {
+  fmt.eprintf("[%d:%d] Error:", pos.line,pos.column)
+  fmt.eprintfln(msg, ..args)
 }
 
-ParserRule :: []bit_set[tok.TOKEN_KIND]
-
-Parser_Rule_Kind:: enum u32 {
-	Property_Requirement,
-
-	COUNT,
+warn :: proc(p: ^Parser, pos: tokenizer.Pos, msg: string, args: ..any) {
+  if p.warn != nil {
+    p.warn(pos, msg, ..args)
+  }
 }
 
-Parser_Low_Level_Rule_Kinds :: enum {
-	Declaration,
-	Property
+err :: proc(p: ^Parser, pos: tokenizer.Pos, msg: string, args: ..any) {
+  if p.err != nil {
+    p.err(pos, msg, ..args)
+  }
 }
 
-Parser_Rules := [Parser_Rule_Kind.COUNT]ParserRule{
-	{{.Period, .Hash}, {.Identifier}},
+next_token :: proc(p: ^Parser) -> bool {
+  p.curr_token = tokenizer.scan(&p.tok)
+  if p.curr_token.kind == .EOF {
+    return false
+  }
+  return true
 }
 
-advance_token :: proc(p: ^Parser) {
-	if p.index >= len(p.tokenizer.tokens) {
-		p.finish = true
-		return
+advance_token :: proc(p: ^Parser) -> tokenizer.Token {
+  p.prev_token = p.curr_token // move the current token back
+  prev := p.prev_token
+
+  if next_token(p) {
+    #partial switch p.curr_token.kind {
+      case .Semicolon:
+        advance_token(p)
+    }
+  }
+  return prev
+}
+
+get_end_pos :: proc(tok: tokenizer.Token) -> tokenizer.Pos {
+  pos := tok.pos
+  pos.offset += len(tok.text)
+  pos.column += len(tok.text)
+  return pos
+}
+
+
+// expect the next token to be a certain kind
+expect :: proc(p: ^Parser, kind: tokenizer.TOKEN_KIND) -> tokenizer.Token {
+  prev := p.curr_token
+  // token was not what was wanted
+  if prev.kind != kind {
+    err(p, prev.pos, "Expected to get %s, got %s", kind, prev.kind)
+  }
+  // move to next token
+  advance_token(p)
+  return prev
+}
+
+// parse a variable declaration
+parse_identifier :: proc(p: ^Parser) -> ^ast.Identifier {
+  token := p.curr_token
+  pos := token.pos
+  name := "_" // undefined identifier
+
+  if token.kind == .Identifier {
+    name = token.text
+    advance_token(p)
+  } else {
+    expect(p, .Identifier)
+  }
+
+  ident := ast.new(ast.Identifier, pos, get_end_pos(token))
+  ident.name = name
+  return ident
+}
+
+// allow the next token if it matches the kind
+allow :: proc(p: ^Parser, kind: tokenizer.TOKEN_KIND) -> bool {
+  if p.curr_token.kind == kind {
+    advance_token(p)
+    return true
+  }
+  return false
+}
+
+
+parse_value :: proc(p: ^Parser) -> ^ast.Expr {
+  return nil
+}
+
+// parses a list of elements within a brace
+parse_elem_list :: proc(p: ^Parser) -> []^ast.Expr {
+  elems: [dynamic]^ast.Expr
+
+  for p.curr_token.kind != .Close_Brace && p.curr_token.kind != .EOF {
+    // elem := parse_value(p)
+  }
+
+  return elems[:]
+}
+
+parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) {
+  elems: []^ast.Expr
+  open := expect(p, .Open_Brace)
+  if p.curr_token.kind != .Close_Brace {
+    elems = parse_elem_list(p)
+  }
+}
+
+parse_atom_value :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^ast.Expr) {
+  operand = value
+  loop := true
+	is_lhs := lhs
+
+	for loop {
+	
 	}
-	p.current = p.lookahead
-	p.index += 1
-	if p.index+1 < len(p.tokenizer.tokens) {
-		p.lookahead = p.tokenizer.tokens[p.index+1]
-	} else {
-		// p.lookahead =
-	}
-
+	
+	return operand
 }
 
-add_to_stack :: proc(p: ^Parser, state: Rule_State) {
-	p.state = state
-	append(&p.states, state)
-}
-remove_from_stack :: proc(p: ^Parser) {
-	if p.states[len(p.states)] != p.state do panic("Malformed .ocss file data")
-	pop(&p.states)
-}
-peek_states :: proc(p: ^Parser) -> Rule_State {
-	return p.states[len(p.states)-1]
-}
-is_state :: proc(p: ^Parser, state: Rule_State) -> bool {
-	return state == p.state && len(p.states)>0
-}
-
-scan_rules :: proc(p: ^Parser) {
-	done:=false
-	for rule, i in Parser_Rules {
-		fmt.println(rule, p.current.kind, p.lookahead.kind)
-		if len(rule) == 0 || done do continue
-	}
+// parses into a basic expression
+parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
+  #partial switch p.curr_token.kind {
+    case .Identifier:
+      return parse_identifier(p)
+    case .Integer, .Float, .String:
+      tok := advance_token(p)
+      basic_lit := ast.new(ast.Basic_Lit, tok.pos, get_end_pos(tok))
+      basic_lit.token = tok
+      return basic_lit
+    case:
+      return nil
+  }
 }
 
-reduce_stack :: proc(p: ^Parser) {
-	s: Structure
-	for {
-		if len(p.stack) == 0 do break
-		sem: Semantic
-		sem.data = pop(&p.stack)
-		append(&s.data, sem)
-	}
+parse_unary_expression :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
+  #partial switch p.curr_token.kind {
+    case .Add, .Sub:
+      op := advance_token(p)
+      expression := parse_unary_expression(p, lhs)
+      
+      unary_expr := ast.new(ast.Unary_Expr, op.pos, expression)
+      unary_expr.op = op
+      unary_expr.expr = expression
+      
+      return unary_expr
+    // case .Increment, .Decrement:
+    //   op := advance_token(p)
+    //   expression := parse_unary_expression(p, lhs)
 
+    //   unary_expr := ast.new(ast.Unary_Expr, op.pos, expression)
+    //   unary_expr.op = op
+    //   unary_expr.expr = expression
+    //   return unary_expr
+  }
+  return nil
 }
 
-update_states :: proc(p: ^Parser) {
-	#partial switch p.current.kind {
-		case .Open_Paren:
-			add_to_stack(p, .In_Paren)
-		case .Close_Paren:
-			remove_from_stack(p)
-	}
+parse_binary_expression :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
+  start_pos := p.curr_token.pos
+  expression := parse_unary_expression(p, lhs)
+
+  for prec := token_precedence(p, p.curr_token.kind); prec >= prec_in; prec -= 1 {
+    loop: for {
+      op := p.curr_token
+      op_prec := token_precedence(p, op.kind)
+
+      if op_prec != prec {
+        break loop
+      }
+      
+      right := parse_binary_expression(p, false, prec+1)
+      if right == nil {
+        err(p, op.pos, "f")
+      }
+      binary_expr := ast.new(ast.Binary_Expr, expression.pos, get_end_pos(p.prev_token))
+      binary_expr.left = expression
+      binary_expr.op = op
+      binary_expr.right = right
+
+      expression = binary_expr
+    }
+  }
+
+  return expression
 }
 
-scan_tokens :: proc(p: ^Parser) {
-	index := p.index
-	current := p.current
-	lookahead := p.lookahead
-
-	update_states(p)
-	append(&p.stack, p.current)
-
-	fmt.println(current, p.state)
-
-	if current.kind == .EOF {
-		p.finish=true
-		return
-	}
-
-
-
-	advance_token(p)
+parse_expression :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
+  return parse_binary_expression(p, lhs, 0+1)
 }
 
-Semantic_Kind :: enum {
-
+token_precedence :: proc(p: ^Parser, kind: tokenizer.TOKEN_KIND) -> int {
+  #partial switch kind {
+    case .Add, .Sub:
+      return 6
+    case .Mul, .Div, .Mod:
+      return 7
+  }
+  return 0
 }
 
-Semantic :: struct {
-	data: tok.Token,
-	type: Semantic_Kind,
+parse_expression_list :: proc(p: ^Parser, lhs: bool) -> []^ast.Expr {
+  expressions: [dynamic]^ast.Expr
+  for {
+    expression := parse_expression(p, lhs)
+    append(&expressions, expression)
+    if p.curr_token.kind != .Comma || p.curr_token.kind == .EOF {
+      break
+    }
+    advance_token(p)
+  }
+  return expressions[:]
 }
 
-Structure_Kind :: enum {
-	Declaration,
-	Property,
-	Value,
-}
+parse_file :: proc(p: ^Parser, file: string) -> bool {
+  p.path = file
+  tokenizer.init(&p.tok, p.path)
+  if p.tok.current <= 0 {
+    // tokenizer is still tokenizing or failed to complete and set cursor to -1
+    return true
+  }
+  return false
+} 
 
-Structure :: struct {
-	kind: Parser_Rule_Kind,
-	data: [dynamic]Semantic,
-	parent: ^Structure,
-	child: [dynamic]^Structure,
-}
-
-parse :: proc(p: ^Parser) {
-	p.allocator = runtime.heap_allocator()
-	p.tokenizer = new(tok.Tokenizer)
-	p.tokenizer.file = p.path
-	defer free(p.tokenizer)
-
-	tok.tokenize_file(p.tokenizer)
-
-	tokens := p.tokenizer.tokens
-	p.index = 0
-	p.current = tokens[p.index]
-	p.lookahead = tokens[p.index+1]
-
-	for !p.finish {
-		scan_tokens(p)
-	}
-}

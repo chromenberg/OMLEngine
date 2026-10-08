@@ -136,7 +136,7 @@ is_class :: proc(t: ^Tokenizer) -> bool {
 	return !is_letter(t.current) || !is_digit(t.current) || t.current != '_'
 }
 
-scan :: proc(t: ^Tokenizer) -> Token{
+scan :: proc(t: ^Tokenizer) -> Token {
 	skip_whitespace(t)
 
 	offset := t.offset
@@ -151,8 +151,10 @@ scan :: proc(t: ^Tokenizer) -> Token{
 		case:
 			advance_rune(t)
 			switch current {
-				case -1:
-					kind = .EOF
+				case -1:  kind = .EOF
+				case '"': 
+				  kind = .String
+					text = read_string(t)
 				case '{': kind = .Open_Brace
 				case '}': kind = .Close_Brace
 				case '(': kind = .Open_Paren
