@@ -13,21 +13,21 @@ build_element :: proc(doc: ^Document, node: ^Node) {
 			})
 		case RectNode:
 			if len(node.id) != 0 {
-				
+
 				if clay.UI(clay.ID(node.id))({
 					backgroundColor = clay.Color{100,40,40,255}
 				}) {
 					render_traverse(doc, node)
 				}
-				
+
 			} else {
-				
+
 				if clay.UI(clay.ID(node.id))({
 					backgroundColor = clay.Color{40,40,40,255}
 				}) {
 					render_traverse(doc, node)
 				}
-				
+
 			}
 	}
 }
@@ -38,8 +38,8 @@ render_traverse :: proc(doc: ^Document, node: ^Node) {
 		if child.tmp_visited do continue
 
 		build_element(doc, child)
-		
-		
+
+
 	}
 }
 
