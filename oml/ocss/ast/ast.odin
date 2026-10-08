@@ -1,5 +1,7 @@
 package ast
 
+import "core:mem"
+import "base:intrinsics"
 import tok "../tokenizer"
 
 // Null Denotation
@@ -32,15 +34,44 @@ BINDING_POWER :: enum {
 // Binding Power
 
 Any_Node :: union {
+  ^Attribute,
+  ^Field,
+  ^Field_List,
+  ^Identifier,
   
+  ^Basic_Lit,
+  ^Unary_Expr,
+  ^Binary_Expr,
+  ^Function_Expr,
+  ^Paren_Expr,
+  ^Call_Expr,
+
+  
+  ^Block_Stmt,
+  ^Assign_Stmt,
+  
+  ^Function_Type,
+
+  ^Value_Decl
 }
 
 Any_Expr :: union {
+  ^Identifier,
+  ^Basic_Lit,
+  ^Function_Expr,
+  ^Call_Expr,
+  ^Paren_Expr,
+  ^Unary_Expr,
+  ^Binary_Expr,
   
+  ^Function_Type,
 }
 
 Any_Stmt :: union {
-  
+  ^Block_Stmt,
+  ^Assign_Stmt,
+
+  ^Value_Decl
 }
 
 Node :: struct {
@@ -124,7 +155,12 @@ Unary_Expr :: struct {
   op: tok.Token,
   expr: ^Expr
 }
-
+Binary_Expr :: struct {
+	using node: Expr,
+	left:  ^Expr,
+	op:    tok.Token,
+	right: ^Expr,
+}
 
 // name(1,2,3,4)
 Call_Expr :: struct {
@@ -191,8 +227,8 @@ Attribute :: struct {
 // Types
 
 
-new_from_pos :: proc($T: typeid, pos, end: tok.Pos) {
-  node, _ := new(T)
+new_from_pos :: proc($T: typeid, pos, end: tok.Pos) -> ^T {
+  node, _ := mem.new(T)
   n.pos = pos
   n.end = end
   n.derived = n
@@ -209,7 +245,7 @@ new_from_pos :: proc($T: typeid, pos, end: tok.Pos) {
   return n
 }
 
-new_from_pos_and_end :: proc($T: typeid, pos: tok.Pos, end: ^Node) {
+new_from_pos_and_end :: proc($T: typeid, pos: tok.Pos, end: ^Node) -> ^T {
   return new(T, pos, end != nil ? end.end : pos)
 }
 
