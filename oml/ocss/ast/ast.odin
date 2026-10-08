@@ -190,3 +190,30 @@ Attribute :: struct {
 
 // Types
 
+
+new_from_pos :: proc($T: typeid, pos, end: tok.Pos) {
+  node, _ := new(T)
+  n.pos = pos
+  n.end = end
+  n.derived = n
+  base: ^Node = n
+
+  when intrinsics.type_has_field(T, "derived_expr") {
+    n.derived_expr = n
+  }
+  
+  when intrinsics.type_has_field(T, "derived_stmt") {
+    n.derived_stmt = n
+  }
+
+  return n
+}
+
+new_from_pos_and_end :: proc($T: typeid, pos: tok.Pos, end: ^Node) {
+  return new(T, pos, end != nil ? end.end : pos)
+}
+
+new :: proc {
+  new_from_pos,
+  new_from_pos_and_end
+}
