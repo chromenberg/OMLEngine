@@ -136,7 +136,7 @@ is_class :: proc(t: ^Tokenizer) -> bool {
 	return !is_letter(t.current) || !is_digit(t.current) || t.current != '_'
 }
 
-next_token :: proc(t: ^Tokenizer) -> Token{
+scan :: proc(t: ^Tokenizer) -> Token{
 	skip_whitespace(t)
 
 	offset := t.offset
@@ -179,27 +179,14 @@ next_token :: proc(t: ^Tokenizer) -> Token{
 	return token
 }
 
-tokenize_file :: proc(t: ^Tokenizer) -> (os.Error) {
+init :: proc(t: ^Tokenizer, source: Maybe(string)) {
+  if source != nil {
+    t.file = source.(string)
+  }
 	file_bytes, read_err := os.read_entire_file(t.file, context.allocator)
-	if read_err != nil {
-		return read_err
-	}
-
 	file_data := strings.clone_from_bytes(file_bytes, context.allocator)
 	defer delete(file_data)
 	delete(file_bytes)
-
-	fmt.println(file_data)
-
 	t.source = file_data
-	eof := false
-	for !eof {
-		token := next_token(t)
-		fmt.printfln("%#v", token)
-		if token.kind == .EOF do eof = true
-	}
-
-	fmt.printfln("%#v", t.tokens[:])
-
-	return nil
+	
 }
