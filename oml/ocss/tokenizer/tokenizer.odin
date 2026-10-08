@@ -1,4 +1,4 @@
-package ocss
+package tokenizer
 
 import "core:unicode"
 import "core:log"
@@ -12,7 +12,7 @@ Tokenizer :: struct {
 	allocator: mem.Allocator,
 	file: string,
 	source: string,
-	
+
 	// we could get away with using a pointer to ensure no weird leaks
 	// however trying to print this would result in some issues
 	tokens: [dynamic]Token,
@@ -52,12 +52,12 @@ advance_rune :: proc(t: ^Tokenizer) {
 		}
 
 		r, width := rune(t.source[t.read_offset]), 1
-		
+
 		t.read_offset += width
 		t.current = r
 	} else {
 		t.offset = len(t.source)
-		
+
 		if t.current == '\n' {
 			// the current line is this far into the string
 			t.line_offset = t.offset
@@ -138,7 +138,7 @@ is_class :: proc(t: ^Tokenizer) -> bool {
 
 next_token :: proc(t: ^Tokenizer) -> Token{
 	skip_whitespace(t)
-	
+
 	offset := t.offset
 	kind: TOKEN_KIND
 	text: string
@@ -162,16 +162,19 @@ next_token :: proc(t: ^Tokenizer) -> Token{
 				case ';': kind = .Semicolon
 				case ':': kind = .Colon
 					// these need a check
-				case '.': kind = .Class
-				case '#': kind = .Id
+				case '.': kind = .Period
+				case '#': kind = .Hash
 			}
 	}
 
 	if text == "" {
 		text = string(t.source[offset : t.offset])
 	}
+	
 	token := Token{kind, text, pos}
-	append(&t.tokens, token)
+	if token.kind != .Invalid {
+		append(&t.tokens, token)
+	}
 
 	return token
 }
@@ -181,13 +184,13 @@ tokenize_file :: proc(t: ^Tokenizer) -> (os.Error) {
 	if read_err != nil {
 		return read_err
 	}
-	
+
 	file_data := strings.clone_from_bytes(file_bytes, context.allocator)
 	defer delete(file_data)
 	delete(file_bytes)
 
 	fmt.println(file_data)
-	
+
 	t.source = file_data
 	eof := false
 	for !eof {
@@ -197,6 +200,6 @@ tokenize_file :: proc(t: ^Tokenizer) -> (os.Error) {
 	}
 
 	fmt.printfln("%#v", t.tokens[:])
-	
+
 	return nil
 }

@@ -1,4 +1,4 @@
-package ocss
+package tokenizer
 
 TOKEN_KIND :: enum u32 {
 	Invalid, 
@@ -7,8 +7,6 @@ TOKEN_KIND :: enum u32 {
 	
 	Literal_Start,
 		Identifier,
-		Class, // these might not be needed
-		Id,
 		String,
 		Integer,
 		Float,
@@ -39,8 +37,7 @@ TOKEN_KIND :: enum u32 {
 	Operator_End,
 
 	Keyword_Start,
-		Pixel,
-		Rem,
+
 	Keyword_End,
 	
 	COUNT
@@ -53,8 +50,6 @@ TOKENS := [TOKEN_KIND.COUNT]string{
 
 	"",
 		"identifier",
-		"class",
-		"id",
 		"string",
 		"int",
 		"float",
@@ -83,8 +78,6 @@ TOKENS := [TOKEN_KIND.COUNT]string{
 	"",
 
 	"",
-		"px",
-		"rem",
 	""
 }
 
