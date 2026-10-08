@@ -1,0 +1,5 @@
+#test (.class.name#id) {
+  background-color: "red";
+  padding: 1 2 3 4;
+  border: 1px solid white;
+}
