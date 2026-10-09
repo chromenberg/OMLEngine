@@ -21,7 +21,11 @@ TOKEN_KIND :: enum u32 {
 		Div,
 		Mod,
 		At,
-		Hash,
+		
+		Selector_Start,
+			Hash,
+			Period,					// .
+		Selector_End,
 	
 		Open_Paren,			// (
 		Close_Paren,		// )
@@ -31,7 +35,7 @@ TOKEN_KIND :: enum u32 {
 		Close_Brace,		// }
 		Colon,					// :
 		Semicolon,			// ;
-		Period,					// .
+
 		Comma,					// ,
 		Whitespace, // Needed because spaces in CSS actually mean something for some stupid reason
 	Operator_End,
@@ -62,8 +66,12 @@ TOKENS := [TOKEN_KIND.COUNT]string{
 		"/",
 		"%",
 		"@",
-		"#",
 		
+		"",
+			"#",
+			".",
+		"",
+			
 		"(",
 		")",
 		"[",
@@ -72,7 +80,6 @@ TOKENS := [TOKEN_KIND.COUNT]string{
 		"}",
 		":",
 		";",
-		".",
 		",",
 		" ",
 	"",
