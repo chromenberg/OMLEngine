@@ -136,40 +136,53 @@ skip_possible_newline_for_literal :: proc(p: ^Parser) -> bool {
 
   return elems[:]
 }
+parse_selector :: proc(p: ^Parser) -> ^ast.Selector {
+	advance_token(p)
+	#partial switch p.cursor.kind {
+		case .Period:
+			// we want .<ident> to occur
+			ident := expect(p, .Identifier)
+			fmt.println(".")
+			selector := ast.new(ast.Selector, p.cursor.pos, get_end_pos(ident))
+			selector.kind = ast.Selector_Kind.Class
+			selector.name = ident
 
-parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) {
-  elems: []^ast.Expr
-  open := expect(p, .Open_Brace)
-  if p.curr_token.kind != .Close_Brace {
-    elems = parse_elem_list(p)
-  }
-}
+			return selector
+		case .Hash:
+			// we want .<ident> to occur
+			ident := expect(p, .Identifier)
+			fmt.println("#")
 
-parse_atom_value :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^ast.Expr) {
-  operand = value
-  loop := true
-	is_lhs := lhs
+			selector := ast.new(ast.Selector, p.cursor.pos, get_end_pos(ident))
+			selector.kind = ast.Selector_Kind.Id
+			selector.name = ident
 
-	for loop {
-	
+			return selector
+		case .Identifier:
+			selector := ast.new(ast.Selector, p.cursor.pos, get_end_pos(p.cursor))
+			fmt.println("iden")
+
+			selector.kind = ast.Selector_Kind.Element
+			selector.name = p.cursor
+
+			return selector
 	}
-	
-	return operand
+	fmt.println(".")
+
+	return nil
 }
 
-// parses into a basic expression
-parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
-  #partial switch p.curr_token.kind {
-    case .Identifier:
-      return parse_identifier(p)
-    case .Integer, .Float, .String:
-      tok := advance_token(p)
-      basic_lit := ast.new(ast.Basic_Lit, tok.pos, get_end_pos(tok))
-      basic_lit.token = tok
-      return basic_lit
-    case:
-      return nil
-  }
+parse_selector_list :: proc(p: ^Parser) -> ^ast.Selector_List {
+	start := p.cursor
+	selectors := ast.new(ast.Selector_List, start.pos, get_end_pos(p.cursor))
+
+	for p.cursor.kind != .Open_Brace && p.cursor.kind != .EOF {
+		selector := parse_selector(p)
+		fmt.println(selector)
+		append(&selectors.inner, selector)
+	}
+
+	return selectors
 }
 
 parse_unary_expression :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
