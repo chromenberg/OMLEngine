@@ -72,8 +72,7 @@ advance_rune :: proc(t: ^Tokenizer) {
 skip_whitespace :: proc(t: ^Tokenizer) {
 	for {
 		switch t.current {
-			case '\t', '\r', '\n':
-				fmt.println("skip")
+			case ' ', '\t', '\r', '\n':
 				advance_rune(t)
 			case:
 				return
@@ -141,11 +140,14 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		case is_letter(current):
 			text = read_identifier(t)
 			kind = .Identifier
+			if text == "rule" {
+				kind = .Rule
+			}
 		case:
 			advance_rune(t)
 			switch current {
 				case -1:  kind = .EOF
-				case '"': 
+				case '"':
 				  kind = .String
 					text = read_string(t)
 				case '{': kind = .Open_Brace
@@ -157,7 +159,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 				case ';': kind = .Semicolon
 				case ':': kind = .Colon
 					// these need a check
-				case '.': 
+				case '.':
 					kind = .Identifier
 					text = read_identifier(t)
 				case '#':
@@ -171,7 +173,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 	if text == "" {
 		text = string(t.source[offset : t.offset])
 	}
-	
+
 	token := Token{kind, text, pos}
 	if token.kind != .Invalid {
 		append(&t.tokens, token)
@@ -181,13 +183,23 @@ scan :: proc(t: ^Tokenizer) -> Token {
 }
 
 init :: proc(t: ^Tokenizer, source: Maybe(string)) {
+	fmt.println("init")
   if source != nil {
     t.file = source.(string)
   }
-	file_bytes, read_err := os.read_entire_file(t.file, context.allocator)
+  t.current = ' '
+  file_bytes, read_err := os.read_entire_file(t.file, context.allocator)
+	defer delete(file_bytes)
+
 	file_data := strings.clone_from_bytes(file_bytes, context.allocator)
-	defer delete(file_data)
-	delete(file_bytes)
+	// defer delete(file_data)
+
 	t.source = file_data
-	
+
+	advance_rune(t)
+	if t.current == utf8.RUNE_BOM {
+		advance_rune(t)
+	}
+	fmt.println("finished")
+
 }
