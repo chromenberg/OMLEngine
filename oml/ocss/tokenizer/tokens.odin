@@ -7,29 +7,16 @@ TOKEN_KIND :: enum u32 {
 	
 	Literal_Start,
 		Identifier,
-		
-		Selector_Start,
-			Class,
-			Id,
-		Selector_End,
-		
-		
+		Whitespace,
+		Number,
 		String,
-		Integer,
-		Float,
 		// TODO: Hex? Pixel?
 		// maybe other value types css has
 	Literal_End,
 	
 	Operator_Start,
-		Add,
-		Sub,
-		Mul,
-		Div,
-		Mod,
-		At,
-		
 		Hash,
+		Comma,					// ,
 		Period,					// .
 
 		Open_Paren,			// (
@@ -38,11 +25,9 @@ TOKEN_KIND :: enum u32 {
 		Close_Bracket,	// ]
 		Open_Brace,			// {
 		Close_Brace,		// }
+		
 		Colon,					// :
 		Semicolon,			// ;
-
-		Comma,					// ,
-		Whitespace, // Needed because spaces in CSS actually mean something for some stupid reason
 	Operator_End,
 
 	Keyword_Start,
@@ -57,25 +42,17 @@ TOKENS := [TOKEN_KIND.COUNT]string{
 	"EOF",
 	"Comment",
 
-	"",
+	"", // .Literal_Start
 		"identifier",
+		" ",
+		"number",
 		"string",
-		"int",
-		"float",
-	"",
+	"", // .Literal_End
 
-	"",
-		"+",
-		"-",
-		"*",
-		"/",
-		"%",
-		"@",
-		
-		"",
-			"#",
-			".",
-		"",
+	"", // .Operator_Start
+		"#",
+		",",
+		".",
 			
 		"(",
 		")",
@@ -85,12 +62,10 @@ TOKENS := [TOKEN_KIND.COUNT]string{
 		"}",
 		":",
 		";",
-		",",
-		" ",
-	"",
+	"", // .Operator_End
 
-	"",
-	""
+	"", // .Keyword_Start
+	"", // .Keyword_End
 }
 
 Token :: struct {
@@ -116,10 +91,6 @@ is_operator :: proc(kind: TOKEN_KIND) -> bool {
 
 is_keyword :: proc(kind: TOKEN_KIND) -> bool {
 	return .Keyword_Start < kind && kind < .Keyword_End 
-}
-
-is_selector :: proc(kind: TOKEN_KIND) -> bool {
-	return .Selector_Start < kind && kind < .Selector_End
 }
 
 is_newline :: proc(tok: Token) -> bool {
