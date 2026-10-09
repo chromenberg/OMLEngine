@@ -31,7 +31,7 @@ TOKEN_KIND :: enum u32 {
 	Operator_End,
 
 	Keyword_Start,
-
+		Rule,
 	Keyword_End,
 	
 	COUNT
@@ -65,6 +65,7 @@ TOKENS := [TOKEN_KIND.COUNT]string{
 	"", // .Operator_End
 
 	"", // .Keyword_Start
+		"rule",
 	"", // .Keyword_End
 }
 

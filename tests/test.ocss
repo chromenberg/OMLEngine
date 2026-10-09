@@ -1,7 +1,3 @@
-#text_with_id {
-	background-color: red;	
+rule (#text_with_id) {
+	background-color: red;
 }
-
-.inputBox .anotherclass.with2requirements {
-	
-}	
