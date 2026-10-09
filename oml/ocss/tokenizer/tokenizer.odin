@@ -72,7 +72,7 @@ advance_rune :: proc(t: ^Tokenizer) {
 skip_whitespace :: proc(t: ^Tokenizer) {
 	for {
 		switch t.current {
-			case ' ', '\t', '\r', '\n':
+			case '\t', '\r', '\n':
 				fmt.println("skip")
 				advance_rune(t)
 			case:
@@ -163,6 +163,8 @@ scan :: proc(t: ^Tokenizer) -> Token {
 				case '#':
 					kind = .Identifier
 					text = read_identifier(t)
+				case ' ':
+					kind = .Whitespace
 			}
 	}
 
