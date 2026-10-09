@@ -87,22 +87,8 @@ expect :: proc(p: ^Parser, kind: tokenizer.TOKEN_KIND) -> tokenizer.Token {
   return prev
 }
 
-// parse a variable declaration
-parse_identifier :: proc(p: ^Parser) -> ^ast.Identifier {
-  token := p.curr_token
-  pos := token.pos
-  name := "_" // undefined identifier
-
-  if token.kind == .Identifier {
-    name = token.text
-    advance_token(p)
-  } else {
-    expect(p, .Identifier)
-  }
-
-  ident := ast.new(ast.Identifier, pos, get_end_pos(token))
-  ident.name = name
-  return ident
+at_eof :: proc(p: ^Parser) -> bool {
+	return p.cursor.kind == .EOF
 }
 
 // allow the next token if it matches the kind
