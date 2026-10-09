@@ -91,15 +91,21 @@ at_eof :: proc(p: ^Parser) -> bool {
 	return p.cursor.kind == .EOF
 }
 
-// allow the next token if it matches the kind
-allow :: proc(p: ^Parser, kind: tokenizer.TOKEN_KIND) -> bool {
-  if p.curr_token.kind == kind {
-    advance_token(p)
-    return true
-  }
-  return false
-}
+peek :: proc(p: ^Parser, lookahead := 0) -> tokenizer.Token {
+	prev_parser := p^
+	p.peeking = true
 
+	defer {
+		// rollback parser
+		p^ = prev_parser
+		p.peeking = false
+	}
+
+	for i := 0; i <= lookahead; i += 1 {
+		advance_token(p)
+	}
+	return p.cursor
+}
 
 parse_value :: proc(p: ^Parser) -> ^ast.Expr {
   return nil
