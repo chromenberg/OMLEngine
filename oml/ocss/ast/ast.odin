@@ -23,7 +23,7 @@ Node :: struct {
 Selector_List :: struct {
 	using node: Node,
 	open: tok.Pos,
-	inner: []^Node,
+	inner: [dynamic]^Node,
 	close: tok.Pos,
 }
 
@@ -35,7 +35,7 @@ Selector_Kind :: enum {
 
 Grouped_Selector :: struct {
 	using node: Node,
-	selectors: []^Selector
+	selectors: [dynamic]^Selector
 }
 
 Selector :: struct {
@@ -53,18 +53,18 @@ Declaration :: struct {
 Block :: struct {
 	using node: Node,
 	open: tok.Pos,
-	inner: []^Node,
+	inner: [dynamic]^Node,
 	close: tok.Pos
 }
 
 Rule :: struct {
 	using node: Node,
-	selectors: []^Selector_List, // we can have many selector conditions inherit one rule
+	selectors: [dynamic]^Selector_List, // we can have many selector conditions inherit one rule
 	inner: ^Block
 }
 
-new_from_pos :: proc($T: typeid, pos, end: tok.Pos) -> ^T {
-  node, _ := mem.new(T)
+new_from_pos :: proc($T: typeid, pos, end: tok.Pos, allocator := context.allocator) -> ^T {
+  node, _ := mem.new(T, allocator)
   node.pos = pos
   node.end = end
   node.derived = node
@@ -81,8 +81,8 @@ new_from_pos :: proc($T: typeid, pos, end: tok.Pos) -> ^T {
   return node
 }
 
-new_from_pos_and_end :: proc($T: typeid, pos: tok.Pos, end: ^Node) -> ^T {
-  return new(T, pos, end != nil ? end.end : pos)
+new_from_pos_and_end :: proc($T: typeid, pos: tok.Pos, end: ^Node, allocator := context.allocator) -> ^T {
+  return new(T, pos, end != nil ? end.end : pos, allocator)
 }
 
 new :: proc {
