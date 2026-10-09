@@ -113,6 +113,10 @@ is_keyword :: proc(kind: TOKEN_KIND) -> bool {
 	return .Keyword_Start < kind && kind < .Keyword_End 
 }
 
+is_selector :: proc(kind: TOKEN_KIND) -> bool {
+	return .Selector_Start < kind && kind < .Selector_End
+}
+
 get_kind :: proc(text: string) -> TOKEN_KIND {
 	// probably very inefficient
 	for kind in TOKEN_KIND {
