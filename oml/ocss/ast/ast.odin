@@ -35,22 +35,21 @@ BINDING_POWER :: enum {
 
 Any_Node :: union {
   ^Attribute,
-  ^Field,
-  ^Field_List,
+  ^Selector,
+  ^Selector_List,
   ^Identifier,
   
   ^Basic_Lit,
   ^Unary_Expr,
   ^Binary_Expr,
-  ^Function_Expr,
+  ^Style_Expr,
   ^Paren_Expr,
-  ^Call_Expr,
 
   
   ^Block_Stmt,
   ^Assign_Stmt,
   
-  ^Function_Type,
+  ^Style_Type,
 
   ^Value_Decl
 }
@@ -58,13 +57,12 @@ Any_Node :: union {
 Any_Expr :: union {
   ^Identifier,
   ^Basic_Lit,
-  ^Function_Expr,
-  ^Call_Expr,
+  ^Style_Expr,
   ^Paren_Expr,
   ^Unary_Expr,
   ^Binary_Expr,
   
-  ^Function_Type,
+  ^Style_Type,
 }
 
 Any_Stmt :: union {
@@ -143,9 +141,9 @@ Paren_Expr :: struct {
 }
 
 
-Function_Expr :: struct {
+Style_Expr :: struct {
   using node: Expr,
-  type: ^Function_Type,
+  type: ^Style_Type,
   body: ^Stmt,
 }
 
@@ -162,44 +160,37 @@ Binary_Expr :: struct {
 	right: ^Expr,
 }
 
-// name(1,2,3,4)
-Call_Expr :: struct {
-  using node: Expr,
-  expr: ^Expr,
-  open: tok.Pos,
-  args: []^Expr,
-  close: tok.Pos,
-}
 
-Function_Type :: struct {
+Style_Type :: struct {
   using node: Expr,
   token: tok.Token,
-  params: ^Field_List,
-  // token to denote the function return symbol
-  // 
-  // intentionally generic name as the symbol may change
-  ret_token: tok.Pos,
-  results: ^Field_List,
+  selectors: ^Selector_List,
 }
 
+Selector_Kind :: enum {
+	Element,
+	Class,
+	Id,
+	Data,
+}
 // a single value for a parameter, return value or arg
-Field :: struct {
+Selector :: struct {
   using node: Node,
-  names: []^Expr,
-  type: ^Expr,
+  name: []^Expr,
+  type: Selector_Kind,
   default: ^Expr,
 }
 
 // A Field List contains an array of fields, used for function parameters, return values
 // or arguments
-Field_List :: struct {
+Selector_List :: struct {
   using node: Node,
   // position where the field list starts
   // 
   // Dictated by an OPEN token
   open: tok.Pos,
   // fields within the field list
-  list: []^Field,
+  list: []^Selector,
   // Dictated by a CLOSED token
   close: tok.Pos
 }
