@@ -1,8 +1,33 @@
 package parser
 
-import "base:runtime"
-import "core:fmt"
 import "core:mem"
+import "core:fmt"
+/*
+// correct single class
+.header {
+	color: red;
+	background: #ffffff;
+}
+
+// correct parent and child
+.header .child {
+	color: red;
+	background: #ffffff;
+}
+
+.header {
+	color red;
+}
+
+.header {
+	color: red
+	background: 1;
+}
+
+#id.header {
+	color: green;
+}
+*/
 
 import "../tokenizer"
 import "../ast"
@@ -10,18 +35,34 @@ import "../ast"
 Warn_Handler :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any)
 Error_Handler :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any)
 
+Parser_Scope :: enum {
+	File,
+	Rule,
+}
+
 Parser :: struct {
-	path: string,
+	allocator: mem.Allocator,
 	tok: tokenizer.Tokenizer,
-	
+
+	trail: tokenizer.Token,
+	cursor: tokenizer.Token,
+
+	inside: ^ast.Node,
+	doc: [dynamic]^ast.Node,
+
+	peeking: bool,
+
 	warn: Warn_Handler,
 	err: Error_Handler,
 	err_count: int,
-	
-	prev_token: tokenizer.Token,
-	curr_token: tokenizer.Token,
+	warn_count: int,
+}
 
-	curr_func: ^ast.Node,
+Abstract_Tree :: struct {
+	path: string,
+	name: string,
+
+	rules: [dynamic]^ast.Node,
 }
 
 default_warn_handler :: proc(pos: tokenizer.Pos, msg: string, args: ..any) {
@@ -41,29 +82,34 @@ warn :: proc(p: ^Parser, pos: tokenizer.Pos, msg: string, args: ..any) {
 }
 
 err :: proc(p: ^Parser, pos: tokenizer.Pos, msg: string, args: ..any) {
+	p.err_count += 1
   if p.err != nil {
     p.err(pos, msg, ..args)
+  }
+
+  if p.err_count > 50 {
+  	panic("error count exceeded limit")
   }
 }
 
 next_token :: proc(p: ^Parser) -> bool {
-  p.curr_token = tokenizer.scan(&p.tok)
-  if p.curr_token.kind == .EOF {
+  p.cursor = tokenizer.scan(&p.tok)
+  if p.cursor.kind == .Invalid {
+  	err(p, p.cursor.pos, "[%d:%d] Invalid token found | Contents: '%v'",
+   			p.cursor.pos.line, p.cursor.pos.column, p.cursor.text)
+   	return false
+  }
+  if p.cursor.kind == .EOF {
     return false
   }
   return true
 }
 
 advance_token :: proc(p: ^Parser) -> tokenizer.Token {
-  p.prev_token = p.curr_token // move the current token back
-  prev := p.prev_token
+  p.trail = p.cursor // move the current token back
+  prev := p.trail
 
-  if next_token(p) {
-    #partial switch p.curr_token.kind {
-      case .Semicolon:
-        advance_token(p)
-    }
-  }
+	next_token(p)
   return prev
 }
 
@@ -77,7 +123,7 @@ get_end_pos :: proc(tok: tokenizer.Token) -> tokenizer.Pos {
 
 // expect the next token to be a certain kind
 expect :: proc(p: ^Parser, kind: tokenizer.TOKEN_KIND) -> tokenizer.Token {
-  prev := p.curr_token
+  prev := p.cursor
   // token was not what was wanted
   if prev.kind != kind {
     err(p, prev.pos, "Expected to get %s, got %s", kind, prev.kind)
@@ -130,20 +176,31 @@ skip_possible_newline_for_literal :: proc(p: ^Parser) -> bool {
 	return false
 }
 
-  for p.curr_token.kind != .Close_Brace && p.curr_token.kind != .EOF {
-    // elem := parse_value(p)
-  }
 
-  return elems[:]
+update_inside :: proc(p: ^Parser) {
+	// ast.new(ast.Rule, p.cursor.pos)
 }
 parse_selector :: proc(p: ^Parser) -> ^ast.Selector {
-	advance_token(p)
-	#partial switch p.cursor.kind {
+	symbol := p.cursor
+ advance_token(p)
+
+	// advance_token(p)
+	#partial switch symbol.kind {
+		// TODO: Stop this overriding every selector
+		// case .Identifier:
+		// 	selector := ast.new(ast.Selector, p.cursor.pos, get_end_pos(p.cursor), p.allocator)
+		// 	// fmt.println("iden")
+
+		// 	selector.kind = ast.Selector_Kind.Element
+		// 	selector.name = p.cursor
+
+		// 	return selector
 		case .Period:
 			// we want .<ident> to occur
+
 			ident := expect(p, .Identifier)
-			fmt.println(".")
-			selector := ast.new(ast.Selector, p.cursor.pos, get_end_pos(ident))
+			// fmt.println(".")
+			selector := ast.new(ast.Selector, symbol.pos, get_end_pos(ident), p.allocator)
 			selector.kind = ast.Selector_Kind.Class
 			selector.name = ident
 
@@ -151,34 +208,27 @@ parse_selector :: proc(p: ^Parser) -> ^ast.Selector {
 		case .Hash:
 			// we want .<ident> to occur
 			ident := expect(p, .Identifier)
-			fmt.println("#")
+			// fmt.println("#")
 
-			selector := ast.new(ast.Selector, p.cursor.pos, get_end_pos(ident))
+			selector := ast.new(ast.Selector, symbol.pos, get_end_pos(ident), p.allocator)
 			selector.kind = ast.Selector_Kind.Id
 			selector.name = ident
 
 			return selector
-		case .Identifier:
-			selector := ast.new(ast.Selector, p.cursor.pos, get_end_pos(p.cursor))
-			fmt.println("iden")
-
-			selector.kind = ast.Selector_Kind.Element
-			selector.name = p.cursor
-
-			return selector
 	}
-	fmt.println(".")
+	// fmt.println(".")
+	// advance_token(p)
 
 	return nil
 }
 
 parse_selector_list :: proc(p: ^Parser) -> ^ast.Selector_List {
 	start := p.cursor
-	selectors := ast.new(ast.Selector_List, start.pos, get_end_pos(p.cursor))
+	selectors := ast.new(ast.Selector_List, start.pos, get_end_pos(p.cursor), p.allocator)
 
-	for p.cursor.kind != .Open_Brace && p.cursor.kind != .EOF {
+	for p.cursor.kind != .Open_Brace && p.cursor.kind != .Close_Paren && p.cursor.kind != .EOF {
 		selector := parse_selector(p)
-		fmt.println(selector)
+		if selector == nil do break
 		append(&selectors.inner, selector)
 	}
 
@@ -188,55 +238,91 @@ parse_selector_list :: proc(p: ^Parser) -> ^ast.Selector_List {
 parse_property :: proc(p: ^Parser) -> ^ast.Declaration {
 	start := p.cursor
 
-	ident := expect(p, .Identifier)	// Prop name
-	c := expect(p, .Colon) 			//
-	// for p.cursor.kind != .Semicolon && p.cursor.kind != .EOF {
-	// }
-	value := p.cursor
-	advance_token(p)
-	semi := expect(p, .Semicolon)
-	prop := ast.new(ast.Declaration, start.pos, get_end_pos(p.cursor))
-	
+	ident := expect(p, .Identifier) // Prop name
+	expect(p, .Colon)               // ':'
+
+	value := p.cursor               // first value token
+	last := value
+	for p.cursor.kind != .Semicolon && p.cursor.kind != .Close_Brace && !at_eof(p) && p.cursor.kind != .Invalid {
+		advance_token(p)
+		last = p.trail
+	}
+	value.text = p.tok.source[value.pos.offset:get_end_pos(last).offset]
+
+	end := last
+	if p.cursor.kind == .Semicolon {
+		end = expect(p, .Semicolon)
+	}
+
+	prop := ast.new(ast.Declaration, start.pos, get_end_pos(end), p.allocator)
 	prop.name = ident
 	prop.value = value
 
 	return prop
 }
 
-parse_expression :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
-  return parse_binary_expression(p, lhs, 0+1)
+parse_block :: proc(p: ^Parser) -> ^ast.Block {
+	start := p.cursor
+	contents : [dynamic]^ast.Node
+
+	for {
+		if p.cursor.kind == .Close_Brace || at_eof(p) do break
+		prop := parse_property(p)
+		if prop != nil {
+			append(&contents, prop)
+		}
+	}
+
+	block := ast.new(ast.Block, start.pos, get_end_pos(p.cursor), p.allocator)
+	block.open = start.pos
+	block.inner = contents
+	block.close = p.cursor.pos
+
+	return block
 }
 
-token_precedence :: proc(p: ^Parser, kind: tokenizer.TOKEN_KIND) -> int {
-  #partial switch kind {
-    case .Add, .Sub:
-      return 6
-    case .Mul, .Div, .Mod:
-      return 7
-  }
-  return 0
+parse_rule :: proc(p: ^Parser) -> ^ast.Rule {
+	start := p.cursor
+	advance_token(p)
+	#partial switch p.cursor.kind {
+		case .Open_Paren:
+			advance_token(p) // consume '('
+
+			list := parse_selector_list(p)
+			expect(p, .Close_Paren)
+			expect(p, .Open_Brace)
+
+			block := parse_block(p)
+			close_brace := expect(p, .Close_Brace)
+
+			rule := ast.new(ast.Rule, start.pos, get_end_pos(close_brace), p.allocator)
+
+			rule.inner = block
+			append(&rule.selectors, list)
+			return rule
+	}
+	return nil
 }
 
-parse_expression_list :: proc(p: ^Parser, lhs: bool) -> []^ast.Expr {
-  expressions: [dynamic]^ast.Expr
-  for {
-    expression := parse_expression(p, lhs)
-    append(&expressions, expression)
-    if p.curr_token.kind != .Comma || p.curr_token.kind == .EOF {
-      break
-    }
-    advance_token(p)
-  }
-  return expressions[:]
-}
+parse :: proc(p: ^Parser, file: string) {
+	alloc : mem.Scratch
 
-parse_file :: proc(p: ^Parser, file: string) -> bool {
-  p.path = file
-  tokenizer.init(&p.tok, p.path)
+	mem.scratch_allocator_init(&alloc, 2_000)
+	p.allocator = mem.scratch_allocator(&alloc)
+
+  tokenizer.init(&p.tok,file)
   if p.tok.current <= 0 {
     // tokenizer is still tokenizing or failed to complete and set cursor to -1
-    return true
+    // fmt.println("still tokenizing")
+    return
   }
-  return false
-} 
+  advance_token(p)
+	for {
+		if at_eof(p) do break
+		if p.cursor.kind == .Rule {
+			rule := parse_rule(p)
+			append(&p.doc, rule)
+		}
 
+	}
+}

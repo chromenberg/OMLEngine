@@ -139,9 +139,13 @@ import_style :: proc(child_node: xml.Element) -> bool {
   log.infof("Importing %v", src)
 
   p: parser.Parser
-  p.path = src.(string)
- 	parser.parse(&p)
-
+  // p.path = src.(string)
+ 	parser.parse(&p, src.(string))
+  ast := parser.extract_ast(&p)
+  
+  parser.format_ast(&ast, {.Simple, .Bars})
+  log.infof("Imported %v", src.(string))
+  // delete(ast.rules)
   return true
 }
 
@@ -156,7 +160,10 @@ deserialize :: proc(xml_doc: ^xml.Document, doc: ^Document, parent: ^Node, curre
 
         if is_style_import(child_node) {
 	       	log.infof("Found <%v> trying to import stylesheet.", child_node.ident)
-	       	if !import_style(child_node) {}
+	       	if import_style(child_node) {
+						
+					}
+						
         }
 
         new_node := update_tree(
@@ -183,4 +190,5 @@ parse :: proc(filename: string, doc: ^Document) {
   doc.allocator = mem.arena_allocator(&doc.arena)
 
   assemble_document(xml_doc, doc)
+  log.infof("Parsed %v", filename)
 }

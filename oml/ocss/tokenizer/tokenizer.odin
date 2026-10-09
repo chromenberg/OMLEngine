@@ -41,7 +41,7 @@ create_token :: proc(t: ^Tokenizer, text: string, line: int, column: int) {
 }
 
 advance_rune :: proc(t: ^Tokenizer) {
-	fmt.println(t.read_offset, len(t.source))
+	// fmt.println(t.read_offset, len(t.source))
 	if t.read_offset < len(t.source) {
 		t.offset = t.read_offset
 
@@ -160,11 +160,9 @@ scan :: proc(t: ^Tokenizer) -> Token {
 				case ':': kind = .Colon
 					// these need a check
 				case '.':
-					kind = .Identifier
-					text = read_identifier(t)
+					kind = .Period
 				case '#':
-					kind = .Identifier
-					text = read_identifier(t)
+					kind = .Hash
 				case ' ':
 					kind = .Whitespace
 			}
