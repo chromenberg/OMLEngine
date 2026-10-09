@@ -185,56 +185,22 @@ parse_selector_list :: proc(p: ^Parser) -> ^ast.Selector_List {
 	return selectors
 }
 
-parse_unary_expression :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
-  #partial switch p.curr_token.kind {
-    case .Add, .Sub:
-      op := advance_token(p)
-      expression := parse_unary_expression(p, lhs)
-      
-      unary_expr := ast.new(ast.Unary_Expr, op.pos, expression)
-      unary_expr.op = op
-      unary_expr.expr = expression
-      
-      return unary_expr
-    // case .Increment, .Decrement:
-    //   op := advance_token(p)
-    //   expression := parse_unary_expression(p, lhs)
+parse_property :: proc(p: ^Parser) -> ^ast.Declaration {
+	start := p.cursor
 
-    //   unary_expr := ast.new(ast.Unary_Expr, op.pos, expression)
-    //   unary_expr.op = op
-    //   unary_expr.expr = expression
-    //   return unary_expr
-  }
-  return nil
-}
+	ident := expect(p, .Identifier)	// Prop name
+	c := expect(p, .Colon) 			//
+	// for p.cursor.kind != .Semicolon && p.cursor.kind != .EOF {
+	// }
+	value := p.cursor
+	advance_token(p)
+	semi := expect(p, .Semicolon)
+	prop := ast.new(ast.Declaration, start.pos, get_end_pos(p.cursor))
+	
+	prop.name = ident
+	prop.value = value
 
-parse_binary_expression :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
-  start_pos := p.curr_token.pos
-  expression := parse_unary_expression(p, lhs)
-
-  for prec := token_precedence(p, p.curr_token.kind); prec >= prec_in; prec -= 1 {
-    loop: for {
-      op := p.curr_token
-      op_prec := token_precedence(p, op.kind)
-
-      if op_prec != prec {
-        break loop
-      }
-      
-      right := parse_binary_expression(p, false, prec+1)
-      if right == nil {
-        err(p, op.pos, "f")
-      }
-      binary_expr := ast.new(ast.Binary_Expr, expression.pos, get_end_pos(p.prev_token))
-      binary_expr.left = expression
-      binary_expr.op = op
-      binary_expr.right = right
-
-      expression = binary_expr
-    }
-  }
-
-  return expression
+	return prop
 }
 
 parse_expression :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
