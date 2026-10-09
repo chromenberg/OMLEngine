@@ -7,6 +7,13 @@ TOKEN_KIND :: enum u32 {
 	
 	Literal_Start,
 		Identifier,
+		
+		Selector_Start,
+			Class,
+			Id,
+		Selector_End,
+		
+		
 		String,
 		Integer,
 		Float,
@@ -22,11 +29,9 @@ TOKEN_KIND :: enum u32 {
 		Mod,
 		At,
 		
-		Selector_Start,
-			Hash,
-			Period,					// .
-		Selector_End,
-	
+		Hash,
+		Period,					// .
+
 		Open_Paren,			// (
 		Close_Paren,		// )
 		Open_Bracket,		// [

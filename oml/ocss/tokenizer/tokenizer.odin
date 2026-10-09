@@ -129,13 +129,6 @@ read_identifier :: proc(t: ^Tokenizer) -> string {
 	return string(t.source[offset:t.offset])
 }
 
-is_class :: proc(t: ^Tokenizer) -> bool {
-	if !is_letter(t.current) || !is_digit(t.current) || t.current != '_' {
-		return false
-	}
-	return !is_letter(t.current) || !is_digit(t.current) || t.current != '_'
-}
-
 scan :: proc(t: ^Tokenizer) -> Token {
 	skip_whitespace(t)
 
@@ -164,8 +157,12 @@ scan :: proc(t: ^Tokenizer) -> Token {
 				case ';': kind = .Semicolon
 				case ':': kind = .Colon
 					// these need a check
-				case '.': kind = .Period
-				case '#': kind = .Hash
+				case '.': 
+					kind = .Identifier
+					text = read_identifier(t)
+				case '#':
+					kind = .Identifier
+					text = read_identifier(t)
 			}
 	}
 
