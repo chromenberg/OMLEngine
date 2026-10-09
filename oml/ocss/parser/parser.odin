@@ -107,13 +107,28 @@ peek :: proc(p: ^Parser, lookahead := 0) -> tokenizer.Token {
 	return p.cursor
 }
 
-parse_value :: proc(p: ^Parser) -> ^ast.Expr {
-  return nil
+skip_possible_newline :: proc(p: ^Parser) -> bool {
+	if tokenizer.is_newline(p.cursor) {
+		advance_token(p)
+		return true
+	}
+	return false
 }
 
-// parses a list of elements within a brace
-parse_elem_list :: proc(p: ^Parser) -> []^ast.Expr {
-  elems: [dynamic]^ast.Expr
+skip_possible_newline_for_literal :: proc(p: ^Parser) -> bool {
+	curr_pos := p.cursor.pos
+	if tokenizer.is_newline(p.cursor) {
+		next := peek(p)
+		if next.pos.line <= curr_pos.line+1 {
+			#partial switch next.kind {
+			case .Open_Brace:
+				advance_token(p)
+				return true
+			}
+		}
+	}
+	return false
+}
 
   for p.curr_token.kind != .Close_Brace && p.curr_token.kind != .EOF {
     // elem := parse_value(p)
