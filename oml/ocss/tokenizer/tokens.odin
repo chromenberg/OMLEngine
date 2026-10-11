@@ -10,6 +10,8 @@ TOKEN_KIND :: enum u32 {
 		Whitespace,
 		Number,
 		String,
+		Integer,
+		Float,
 		// TODO: Hex? Pixel?
 		// maybe other value types css has
 	Literal_End,
@@ -47,6 +49,8 @@ TOKENS := [TOKEN_KIND.COUNT]string{
 		" ",
 		"number",
 		"string",
+		"integer",
+		"float",
 	"", // .Literal_End
 
 	"", // .Operator_Start
