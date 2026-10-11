@@ -1,2 +1,4 @@
 OMLEngine.exe
 OMLEngine.pdb
+tests/oml_tests/*.exe
+tests/oml_tests/*.pdb

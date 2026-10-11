@@ -186,15 +186,14 @@ parse_selector :: proc(p: ^Parser) -> ^ast.Selector {
 
 	// advance_token(p)
 	#partial switch symbol.kind {
-		// TODO: Stop this overriding every selector
-		// case .Identifier:
-		// 	selector := ast.new(ast.Selector, p.cursor.pos, get_end_pos(p.cursor), p.allocator)
-		// 	// fmt.println("iden")
+		case .Identifier:
+			// a bare identifier is an element selector; the name is the symbol
+			// itself, since the cursor has already moved past it
+			selector := ast.new(ast.Selector, symbol.pos, get_end_pos(symbol), p.allocator)
+			selector.kind = ast.Selector_Kind.Element
+			selector.name = symbol
 
-		// 	selector.kind = ast.Selector_Kind.Element
-		// 	selector.name = p.cursor
-
-		// 	return selector
+			return selector
 		case .Period:
 			// we want .<ident> to occur
 
@@ -225,6 +224,7 @@ parse_selector :: proc(p: ^Parser) -> ^ast.Selector {
 parse_selector_list :: proc(p: ^Parser) -> ^ast.Selector_List {
 	start := p.cursor
 	selectors := ast.new(ast.Selector_List, start.pos, get_end_pos(p.cursor), p.allocator)
+	selectors.inner = make([dynamic]^ast.Node, p.allocator)
 
 	for p.cursor.kind != .Open_Brace && p.cursor.kind != .Close_Paren && p.cursor.kind != .EOF {
 		selector := parse_selector(p)
@@ -250,7 +250,7 @@ parse_property :: proc(p: ^Parser) -> ^ast.Declaration {
 		advance_token(p)
 		last = p.trail
 	}
-	
+
 	value.text = p.tok.source[value.pos.offset:get_end_pos(last).offset]
 
 	end := last
@@ -267,7 +267,7 @@ parse_property :: proc(p: ^Parser) -> ^ast.Declaration {
 
 parse_block :: proc(p: ^Parser) -> ^ast.Block {
 	start := p.cursor
-	contents : [dynamic]^ast.Node
+	contents := make([dynamic]^ast.Node, p.allocator)
 
 	for {
 		if p.cursor.kind == .Close_Brace || at_eof(p) do break
@@ -302,17 +302,17 @@ parse_rule :: proc(p: ^Parser) -> ^ast.Rule {
 			rule := ast.new(ast.Rule, start.pos, get_end_pos(close_brace), p.allocator)
 
 			rule.inner = block
+			rule.selectors = make([dynamic]^ast.Selector_List, p.allocator)
 			append(&rule.selectors, list)
 			return rule
 	}
 	return nil
 }
 
-parse :: proc(p: ^Parser, file: string) {
-	alloc : mem.Scratch
+parse :: proc(p: ^Parser, file: string, allocator := context.allocator) {
+	p.allocator = allocator
 
-	mem.scratch_allocator_init(&alloc, 2_000)
-	p.allocator = mem.scratch_allocator(&alloc)
+  p.doc = make([dynamic]^ast.Node, p.allocator)
 
   tokenizer.init(&p.tok,file)
   if p.tok.current <= 0 {

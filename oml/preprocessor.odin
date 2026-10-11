@@ -14,17 +14,17 @@ build_element :: proc(doc: ^Document, node: ^Node) {
 		case RectNode:
 			if len(node.id) != 0 {
 
-				if clay.UI(clay.ID(node.id))({
-					backgroundColor = clay.Color{100,40,40,255}
-				}) {
+				if clay.UI(clay.ID(node.id))(
+				  node.styles != nil ? node.styles.properties : {}
+				) {
 					render_traverse(doc, node)
 				}
 
 			} else {
 
-				if clay.UI(clay.ID(node.id))({
-					backgroundColor = clay.Color{40,40,40,255}
-				}) {
+				if clay.UI()(
+					node.styles != nil ? node.styles.properties : {}
+				) {
 					render_traverse(doc, node)
 				}
 

@@ -52,7 +52,7 @@ clay_render :: proc(
   for i in 0 ..< commands.length {
     render_command := clay.RenderCommandArray_Get(commands, i)
     bounds := render_command.boundingBox
-    
+
     #partial switch render_command.commandType {
       case .None:
       case .Rectangle:
@@ -61,7 +61,7 @@ clay_render :: proc(
         if is_rounded(config.cornerRadius) {
           draw_rect(
             bounds,
-            config.cornerRadius.topLeft,
+            corner_roundness(config.cornerRadius.topLeft, bounds),
             config.backgroundColor
           )
         } else {
@@ -80,9 +80,9 @@ clay_render :: proc(
         cstr_text := strings.clone_to_cstring(text, allocator)
 
         rl.DrawTextEx(
-          raylib_fonts[config.fontId].font, 
+          raylib_fonts[config.fontId].font,
           cstr_text,
-          {bounds.x, bounds.y}, 
+          {bounds.x, bounds.y},
           f32(config.fontSize),
           f32(config.letterSpacing),
           clay_to_rl(config.textColor)
@@ -129,7 +129,7 @@ clay_render :: proc(
   			// 		config.color,
   			// 	)
   			// }
-        
+
   			// Rounded Borders
   			if config.cornerRadius.topLeft > 0 {
   				draw_arc(
@@ -178,7 +178,7 @@ clay_render :: proc(
       case .OverlayColorStart:
   			config := render_command.renderData.overlayColor
   			append(&overlay_colors, config.color)
-     
+
   		case .OverlayColorEnd:
   			pop(&overlay_colors)
     }
@@ -186,10 +186,18 @@ clay_render :: proc(
 }
 
 is_rounded :: proc(radius: clay.CornerRadius) -> bool {
-  return radius.bottomLeft  > 0 || 
+  return radius.bottomLeft  > 0 ||
          radius.bottomRight > 0 ||
          radius.topLeft     > 0 ||
          radius.topRight    > 0
+}
+
+// ocss styles a corner radius in pixels, but clay/raylib express roundness
+// relative to half of the shortest side, so convert using the final bounds.
+corner_roundness :: proc(radius: f32, bounds: clay.BoundingBox) -> f32 {
+  shortest := min(bounds.width, bounds.height)
+  if shortest <= 0 do return 0
+  return math.clamp(radius * 2 / shortest, 0, 1)
 }
 
 @(private="file", require_results)
@@ -273,7 +281,7 @@ draw_arc :: proc(x, y: f32, inner_rad, outer_rad: f32, start_angle, end_angle: f
 }
 
 error_handler :: proc "c" (data: clay.ErrorData) {
-  
+
 }
 
 
@@ -286,20 +294,20 @@ layout_engine_min_memory :: proc() -> c.size_t {
 
 init_renderer :: proc(clay_mem: ^[^]u8) {
 	// setup the layout manager
-	
+
 	arena: clay.Arena = clay.CreateArenaWithCapacityAndMemory(
 		layout_engine_min_memory(), clay_mem^
 	)
-	
+
 	clay.Initialize(
-		arena, 
+		arena,
 		{f32(WindowWidth),f32(WindowHeight)},
 		{handler = error_handler}
 	)
 	clay.SetMeasureTextFunction(measure_text_ascii, nil)
 
 	// setup renderer
-	
+
 	rl.SetConfigFlags({.VSYNC_HINT, .WINDOW_RESIZABLE, .MSAA_4X_HINT})
   rl.InitWindow(i32(WindowWidth), i32(WindowHeight), "Erdene")
   rl.SetTargetFPS(rl.GetMonitorRefreshRate(rl.GetCurrentMonitor()))
@@ -309,7 +317,7 @@ init_renderer :: proc(clay_mem: ^[^]u8) {
   load_font(2, 16,  FONT_PRIMARY)
   load_font(3, 24, FONT_PRIMARY)
   load_font(4, 32, FONT_PRIMARY)
-  
+
 }
 
 update_data :: proc() {
@@ -325,7 +333,7 @@ update_data :: proc() {
 
 render :: proc(doc: ^oml.Document) {
 	commands := oml.render(doc, rl.GetFrameTime())
-  
+
 	rl.BeginDrawing()
   clay_render(&commands)
   rl.EndDrawing()

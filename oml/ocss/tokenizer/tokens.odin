@@ -1,10 +1,10 @@
 package tokenizer
 
 TOKEN_KIND :: enum u32 {
-	Invalid, 
+	Invalid,
 	EOF,
 	Comment,
-	
+
 	Literal_Start,
 		Identifier,
 		Whitespace,
@@ -15,11 +15,12 @@ TOKEN_KIND :: enum u32 {
 		// TODO: Hex? Pixel?
 		// maybe other value types css has
 	Literal_End,
-	
+
 	Operator_Start,
 		Hash,
 		Comma,					// ,
 		Period,					// .
+		Percent,				// %
 
 		Open_Paren,			// (
 		Close_Paren,		// )
@@ -27,7 +28,7 @@ TOKEN_KIND :: enum u32 {
 		Close_Bracket,	// ]
 		Open_Brace,			// {
 		Close_Brace,		// }
-		
+
 		Colon,					// :
 		Semicolon,			// ;
 	Operator_End,
@@ -35,7 +36,7 @@ TOKEN_KIND :: enum u32 {
 	Keyword_Start,
 		Rule,
 	Keyword_End,
-	
+
 	COUNT
 }
 
@@ -57,7 +58,8 @@ TOKENS := [TOKEN_KIND.COUNT]string{
 		"#",
 		",",
 		".",
-			
+		"%",
+
 		"(",
 		")",
 		"[",
@@ -87,15 +89,15 @@ Pos :: struct {
 }
 
 is_literal :: proc(kind: TOKEN_KIND) -> bool {
-	return .Literal_Start < kind && kind < .Literal_End 
+	return .Literal_Start < kind && kind < .Literal_End
 }
 
 is_operator :: proc(kind: TOKEN_KIND) -> bool {
-	return .Operator_Start < kind && kind < .Operator_End 
+	return .Operator_Start < kind && kind < .Operator_End
 }
 
 is_keyword :: proc(kind: TOKEN_KIND) -> bool {
-	return .Keyword_Start < kind && kind < .Keyword_End 
+	return .Keyword_Start < kind && kind < .Keyword_End
 }
 
 is_newline :: proc(tok: Token) -> bool {

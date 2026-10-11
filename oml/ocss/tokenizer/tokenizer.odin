@@ -1,4 +1,4 @@
-/* 
+/*
   Credits to GingerBill and the Odin team.
   `core:odin/tokenizer` is the reference for making this while learning
 
@@ -138,7 +138,7 @@ read_identifier :: proc(t: ^Tokenizer) -> string {
 // returns the contents between the start position of a token and the read head pos
 stringify :: proc(t: ^Tokenizer, start_pos: int) -> string {
   return string(t.source[start_pos:t.offset])
-} 
+}
 
 peek_byte :: proc(t: ^Tokenizer, lookahead := 0) -> byte {
   // ensure we are reading within the bounds of the source file
@@ -195,11 +195,11 @@ scan_number :: proc(t: ^Tokenizer, seen_dec: bool) -> (TOKEN_KIND, string) {
     }
     return false
   }
-  
+
   offset := t.offset
   kind := TOKEN_KIND.Number
   seen_point := seen_dec
-  
+
   if seen_point {
     kind = .Float
     scan_mantissa(t, 10)
@@ -221,7 +221,7 @@ scan_number :: proc(t: ^Tokenizer, seen_dec: bool) -> (TOKEN_KIND, string) {
       case: // not handling other types for now
         seen_point = false
         scan_mantissa(t, 10) // still in base-10
-        
+
         if t.current == '.' { // have we found a float?
           seen_point = true
           if scan_fraction(t, &kind) {
@@ -236,7 +236,7 @@ scan_number :: proc(t: ^Tokenizer, seen_dec: bool) -> (TOKEN_KIND, string) {
   }
 
   scan_mantissa(t, 10)
-  
+
   if scan_fraction(t, &kind) {
     return kind, stringify(t, offset)
   }
@@ -287,6 +287,8 @@ scan :: proc(t: ^Tokenizer) -> Token {
 					// these need a check
 				case '#':
 					kind = .Hash
+				case '%':
+					kind = .Percent
 				case ' ':
 					kind = .Whitespace
 			}

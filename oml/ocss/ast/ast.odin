@@ -31,7 +31,7 @@ Selector_Kind :: enum {
 	Element,
 	Id,
 	Class,
-	Data
+	Data,
 }
 
 Grouped_Selector :: struct {

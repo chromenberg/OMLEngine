@@ -1,7 +1,10 @@
 package oml
 // The type of a node as parsed in an OML document
+import lua "vendor:lua/5.4"
 import "core:mem"
 import "base:runtime"
+import "ocss"
+
 NodeType :: enum {
   Root,
   Head,
@@ -98,12 +101,10 @@ StyleData :: struct {
 
 NodeStyle :: struct {
   class_name: string,
-  // A pointer to the style data that was parsed from the ocss file
-  // 
-  // This is a pointer as style info is shared and can be empty or added later.
-  // ocss is parsed instantly when the first link is found,this is so style references in the body cannot 
-  // prematurely get data
-  data: ^StyleData
+  // A pointer to the style data computed after the ocss trees were merged into
+  // the dom. Style info is shared, so this is a pointer and may stay nil until
+  // the merge completes (or forever, when no rule matches).
+  data: ^ocss.Style_Rule
 }
 
 
@@ -114,10 +115,15 @@ INode :: struct {
   type_id: typeid,
   has_children: bool,
 
+  // the element name (rect, text, ...) used to match element selectors
+  tag: string,
   // classes the node has
-  classes: [dynamic]^NodeStyle,
-
-  id: string
+  classes: []string,
+  // the style computed by merging every matching ocss rule into this node
+  styles: ^ocss.Style_Rule,
+  id: string,
+  // the amount of times this item is referenced by the lua runtime
+  refs: int
 }
 
 Node :: struct {
@@ -147,13 +153,6 @@ StyleClass :: NodeStyle
 // A style id is still referenced by a name and style data, so we can go off the class data
 StyleId :: StyleClass
 
-Stylesheet :: struct {
-  name: string,
-  path: string,
-  classes: [dynamic]^StyleClass,
-  id_map: map[string]^StyleId,
-}
-
 // Contains the parsed version of an OML document
 Document :: struct {
   arena     : mem.Arena,
@@ -163,5 +162,17 @@ Document :: struct {
   tree : ^Node,
   body : ^Node,
   head : ^Node,
-  styles: [dynamic]^Stylesheet
+
+  // queued ocss imports
+  style_imports: [dynamic]string,
+  // ocss styles
+  styles: [dynamic]^ocss.Style_Sheet,
+
+  script_imports: [dynamic]string,
+  scripts: [dynamic]^Loaded_Script
+}
+
+Loaded_Script :: struct {
+  name: cstring,
+  lua_state: ^lua.State
 }

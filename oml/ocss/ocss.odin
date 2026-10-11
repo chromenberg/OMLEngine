@@ -1,149 +1,423 @@
-
 package ocss
 
-import "core:fmt"
-import "core:c"
+import "core:strconv"
+import "core:strings"
 import "shared:clay"
-import "parser"
 import "ast"
+import "parser"
 
-// === Style Colors ===
-ColorType :: enum {
-  RGB,
-  RGBA,
-  HEX,
-}
-Color :: struct {
-  type: ColorType
-}
-// RGB color data, inherits from base Color data
-RGBColor :: struct {
-  using _: Color,
-  r: u8,
-  g: u8,
-  b: u8,
-}
-// RGBA color data, inherits from RGBColor and extends an alpha channel
-RGBAColor :: struct {
-  using _: RGBColor,
-  a: u8,
-}
-
-// === Positioning ===
-Padding :: struct {
-  top: int,
-  right: int,
-  bottom: int,
-  left: int,
-}
-PaddingBlock :: struct {
-  top: int,
-  bottom: int,
-}
-PaddingInline :: struct {
-  left: int,
-  right: int,
-}
-SizingInfo :: struct {
-  width: int,
-  height: int,
-}
-Alignment :: enum {
-  None,
-  Center,
-  Start,
-  End,
-}
-LayoutAlignment :: struct {
-  // how left or right are the children aligned
-  x: Alignment,
-  y: Alignment
-}
-
-// === Text ===
-FontData :: struct {
-  size: int,
-  weight: int,
-  family: string,
-}
-
-// Rule selectors
-
-
-Style_Padding :: struct {
-  left:   u16,
-  right:  u16,
-  top:    u16,
-  bottom: u16
-}
-
-Style_Alignment :: struct {
-  x: clay.LayoutAlignmentX,
-  y: clay.LayoutAlignmentY
-}
-
-Style_Layout_Props :: struct {
-  layoutDirection: clay.LayoutDirection,
-  padding: Style_Padding,
-  childGap: c.uint16_t,
-  childAlignment: Style_Alignment,
-  sizing: SizingInfo,
-}
-
-Style_Properties :: struct {
-  layout: Style_Layout_Props,
-  backgroundColor : Color,
-}
-
+// A single selector a rule applies to (`.class`, `#id` or `element`).
 Selector :: struct {
   name: string,
-  type: ast.Selector_Kind
+  type: ast.Selector_Kind,
 }
 
+// One `name: value` pair exactly as written inside a rule block.
+Declaration :: struct {
+  name:  string,
+  value: string,
+}
+
+// A single rule of a stylesheet.
+//
+// Rules are allocated individually so that a pointer to one stays valid even
+// when the owning stylesheet collects more rules. The old code stored rules by
+// value in a dynamic array and pointed into it, so every append invalidated the
+// pointers held by the id/class maps.
 Style_Rule :: struct {
-  selectors: [dynamic]Selector,
-  properties: Style_Properties
+  selectors:    [dynamic]Selector,
+  declarations: [dynamic]Declaration,
+  // The clay config produced by applying `declarations` in order.
+  properties:   clay.ElementDeclaration,
 }
 
+// A parsed ocss file: the ocss equivalent of the cssom.
+//
+// It lives on its own, independently of any oml document, and is only merged
+// into the dom afterwards. The lookup maps are indexes into the rule tree and
+// only ever point at heap allocated rules, so they are never invalidated.
 Style_Sheet :: struct {
-  name: string,
-  path: string,
-  rules: [dynamic]Style_Rule
+  name:       string,
+  path:       string,
+  rules:      [dynamic]^Style_Rule,
+  idMap:      map[string]^Style_Rule,
+  classMap:   map[string]^Style_Rule,
+  elementMap: map[string]^Style_Rule,
 }
 
-load_selectors :: proc(rule: ^Style_Rule, list: ^ast.Selector_List) {
+// Accumulates declarations while styles are merged, then bakes them into a
+// single clay config. Sizing needs accumulation because e.g. `width`,
+// `min-width` and `max-width` may arrive from different rules and have to be
+// combined into one axis.
+Style_Builder :: struct {
+  layout:     Layout_Builder,
+  background: clay.Color,
+  // corner radius in pixels; the renderer converts it to clay/raylib's
+  // relative roundness using the element's final bounds
+  radius:     f32,
+}
+
+Layout_Builder :: struct {
+  direction: clay.LayoutDirection,
+  gap:       u16,
+  align_x:   clay.LayoutAlignmentX,
+  align_y:   clay.LayoutAlignmentY,
+  padding:   clay.Padding,
+  width:     Axis_Builder,
+  height:    Axis_Builder,
+}
+
+Axis_Builder :: struct {
+  type:  clay.SizingType,
+  // fixed pixels for .Fixed, or a 0..1 fraction for .Percent
+  value: f32,
+  min:   f32,
+  max:   f32,
+}
+
+// === Selector loading ===
+
+load_selectors :: proc(rule: ^Style_Rule, list: ^ast.Selector_List, sheet: ^Style_Sheet, allocator := context.allocator) {
   for selector in list.inner {
     #partial switch d in selector.derived {
     case ^ast.Selector:
-      selec: Selector
-      selec.name = d.name.text
-      selec.type = d.kind
-
+      selec := Selector {
+        name = strings.clone(d.name.text, allocator),
+        type = d.kind,
+      }
       append(&rule.selectors, selec)
+
+      // Index the rule so direct lookups stay cheap. `map_insert` overwrites,
+      // keeping the most recently added rule for a repeated selector.
+      switch d.kind {
+      case .Id:      map_insert(&sheet.idMap, selec.name, rule)
+      case .Class:   map_insert(&sheet.classMap, selec.name, rule)
+      case .Element: map_insert(&sheet.elementMap, selec.name, rule)
+      case .Data:
+      }
     }
   }
 }
 
-load_selector_list :: proc(rule: ^Style_Rule, data: ^ast.Rule) {
-  for selector_list in data.selectors {
-    load_selectors(rule, selector_list)
-  }  
+load_selector_list :: proc(rule: ^Style_Rule, data: [dynamic]^ast.Selector_List, sheet: ^Style_Sheet, allocator := context.allocator) {
+  for selector_list in data {
+    load_selectors(rule, selector_list, sheet, allocator)
+  }
 }
 
-create_style_sheet :: proc(p: ^parser.Parser) {
-  tree := p.doc
-  sheet: Style_Sheet
-  sheet.name = p.tok.file
-  for rule in tree {
-    parsed_rule: Style_Rule
-    
-    #partial switch r in rule.derived {
+load_properties :: proc(rule: ^Style_Rule, props: ^ast.Block, allocator := context.allocator) {
+  for prop in props.inner {
+    typed_prop := prop.derived.(^ast.Declaration)
+
+    append(&rule.declarations, Declaration {
+      name  = strings.clone(typed_prop.name.text, allocator),
+      value = strings.clone(typed_prop.value.text, allocator),
+    })
+  }
+
+  // Resolve the rule's own clay config from its declarations.
+  builder: Style_Builder
+  for declaration in rule.declarations {
+    apply_declaration(&builder, declaration)
+  }
+  rule.properties = finalize(builder)
+}
+
+// Maps one ocss declaration onto the accumulating style builder.
+apply_declaration :: proc(style: ^Style_Builder, declaration: Declaration) {
+  switch declaration.name {
+  case "background-color":
+    if color, ok := parse_color(declaration.value); ok do style.background = color
+  case "corner-radius":
+    if radius, ok := parse_length(declaration.value); ok do style.radius = radius
+  case "padding":
+    apply_padding(&style.layout, declaration.value)
+  case "gap":
+    if gap, ok := parse_int(declaration.value); ok do style.layout.gap = u16(gap)
+  case "direction":
+    switch declaration.value {
+    case "left-to-right", "row":    style.layout.direction = .LeftToRight
+    case "top-to-bottom", "column": style.layout.direction = .TopToBottom
+    }
+  case "align-items":
+    if align, ok := Alignment_X_Map[declaration.value]; ok do style.layout.align_x = align
+  case "justify-content":
+    if align, ok := Alignment_Y_Map[declaration.value]; ok do style.layout.align_y = align
+  case "width":
+    apply_size(&style.layout.width, declaration.value)
+  case "height":
+    apply_size(&style.layout.height, declaration.value)
+  case "min-width":
+    if value, ok := parse_length(declaration.value); ok do style.layout.width.min = value
+  case "min-height":
+    if value, ok := parse_length(declaration.value); ok do style.layout.height.min = value
+  case "max-width":
+    if value, ok := parse_length(declaration.value); ok do style.layout.width.max = value
+  case "max-height":
+    if value, ok := parse_length(declaration.value); ok do style.layout.height.max = value
+  }
+}
+
+// Sets the primary sizing of an axis (`width`/`height`).
+apply_size :: proc(axis: ^Axis_Builder, value: string) {
+  type, amount, ok := parse_size(value)
+  if !ok do return
+  axis.type = type
+  axis.value = amount
+}
+
+// Bakes an accumulated builder into a clay element config.
+finalize :: proc(style: Style_Builder) -> clay.ElementDeclaration {
+  config: clay.ElementDeclaration
+  config.layout.layoutDirection = style.layout.direction
+  config.layout.childGap = style.layout.gap
+  config.layout.childAlignment = {x = style.layout.align_x, y = style.layout.align_y}
+  config.layout.padding = style.layout.padding
+  config.layout.sizing.width = finalize_axis(style.layout.width)
+  config.layout.sizing.height = finalize_axis(style.layout.height)
+  config.backgroundColor = style.background
+  // pixels; the renderer converts to roundness once the bounds are known
+  config.cornerRadius = clay.CornerRadiusAll(style.radius)
+  return config
+}
+
+finalize_axis :: proc(axis: Axis_Builder) -> clay.SizingAxis {
+  switch axis.type {
+  case .Percent:
+    return clay.SizingPercent(axis.value)
+  case .Fixed:
+    // min/max clamp the fixed size; a zero constraint means "unset"
+    value := axis.value
+    if axis.min > 0 && value < axis.min do value = axis.min
+    if axis.max > 0 && value > axis.max do value = axis.max
+    return clay.SizingFixed(value)
+  case .Grow:
+    return clay.SizingGrow({min = axis.min, max = axis.max})
+  case .Fit:
+    return clay.SizingFit({min = axis.min, max = axis.max})
+  }
+  return clay.SizingFit()
+}
+
+// Applies a css-like padding shorthand (1..4 values, space separated).
+apply_padding :: proc(layout: ^Layout_Builder, value: string) {
+  parts := strings.fields(value, context.temp_allocator)
+  if len(parts) == 0 || len(parts) > 4 do return
+
+  values: [4]int
+  for part, i in parts {
+    v, ok := parse_int(part)
+    if !ok do return
+    values[i] = v
+  }
+
+  padding: clay.Padding
+  switch len(parts) {
+  case 1:
+    // all edges
+    padding.top    = u16(values[0])
+    padding.right  = u16(values[0])
+    padding.bottom = u16(values[0])
+    padding.left   = u16(values[0])
+  case 2:
+    // block | inline
+    padding.top    = u16(values[0])
+    padding.bottom = u16(values[0])
+    padding.left   = u16(values[1])
+    padding.right  = u16(values[1])
+  case 3:
+    // top | inline | bottom
+    padding.top    = u16(values[0])
+    padding.left   = u16(values[1])
+    padding.right  = u16(values[1])
+    padding.bottom = u16(values[2])
+  case:
+    // top | right | bottom | left
+    padding.top    = u16(values[0])
+    padding.right  = u16(values[1])
+    padding.bottom = u16(values[2])
+    padding.left   = u16(values[3])
+  }
+  layout.padding = padding
+}
+
+// === Value parsing ===
+
+parse_int :: proc(value: string) -> (int, bool) {
+  result, ok := strconv.parse_int(strings.trim_space(value))
+  return result, ok
+}
+
+parse_float :: proc(value: string) -> (f32, bool) {
+  result, ok := strconv.parse_f32(strings.trim_space(value))
+  return result, ok
+}
+
+// Parses a pixel length, accepting an optional `px` suffix.
+parse_length :: proc(value: string) -> (f32, bool) {
+  text := strings.trim_space(value)
+  if strings.has_suffix(text, "px") do text = text[:len(text) - 2]
+  return parse_float(text)
+}
+
+// `fit` and `grow` are keywords, `N%` is a percentage and everything else is a
+// pixel size. `type` is only meaningful when `ok` is true.
+parse_size :: proc(value: string) -> (type: clay.SizingType, amount: f32, ok: bool) {
+  text := strings.trim_space(value)
+  switch text {
+  case "fit":  return .Fit, 0, true
+  case "grow": return .Grow, 0, true
+  }
+
+  if strings.has_suffix(text, "%") {
+    percent, percent_ok := parse_float(text[:len(text) - 1])
+    if !percent_ok do return .Fit, 0, false
+    return .Percent, percent / 100, true
+  }
+
+  length, length_ok := parse_length(text)
+  if !length_ok do return .Fit, 0, false
+  return .Fixed, length, true
+}
+
+parse_hex_byte :: proc(text: string) -> (u8, bool) {
+  value, ok := strconv.parse_int(text, 16)
+  if !ok do return 0, false
+  return u8(value), true
+}
+
+// Parses a `#rgb`, `#rrggbb` or `#rrggbbaa` color into a clay color.
+parse_color :: proc(value: string) -> (clay.Color, bool) {
+  hex := strings.trim_space(value)
+  if len(hex) == 0 || hex[0] != '#' do return {}, false
+  hex = hex[1:]
+
+  switch len(hex) {
+  case 3:
+    r, r_ok := parse_hex_byte(hex[0:1])
+    g, g_ok := parse_hex_byte(hex[1:2])
+    b, b_ok := parse_hex_byte(hex[2:3])
+    if !r_ok || !g_ok || !b_ok do return {}, false
+    return {f32(r) * 17, f32(g) * 17, f32(b) * 17, 255}, true
+  case 6:
+    r, r_ok := parse_hex_byte(hex[0:2])
+    g, g_ok := parse_hex_byte(hex[2:4])
+    b, b_ok := parse_hex_byte(hex[4:6])
+    if !r_ok || !g_ok || !b_ok do return {}, false
+    return {f32(r), f32(g), f32(b), 255}, true
+  case 8:
+    r, r_ok := parse_hex_byte(hex[0:2])
+    g, g_ok := parse_hex_byte(hex[2:4])
+    b, b_ok := parse_hex_byte(hex[4:6])
+    a, a_ok := parse_hex_byte(hex[6:8])
+    if !r_ok || !g_ok || !b_ok || !a_ok do return {}, false
+    return {f32(r), f32(g), f32(b), f32(a)}, true
+  }
+  return {}, false
+}
+
+// === Stylesheet construction ===
+
+// Builds a standalone stylesheet from a parsed ocss file.
+create_style_sheet :: proc(p: ^parser.Parser, allocator := context.allocator) -> ^Style_Sheet {
+  sheet := new(Style_Sheet, allocator)
+  sheet.name = strings.clone(p.tok.file, allocator)
+  sheet.path = strings.clone(p.tok.file, allocator)
+  // Explicitly bind the collections to the passed allocator, otherwise the
+  // first append/map_insert would silently fall back to context.allocator.
+  sheet.rules = make([dynamic]^Style_Rule, allocator)
+  sheet.idMap = make(map[string]^Style_Rule, allocator)
+  sheet.classMap = make(map[string]^Style_Rule, allocator)
+  sheet.elementMap = make(map[string]^Style_Rule, allocator)
+
+  for node in p.doc {
+    #partial switch r in node.derived {
     case ^ast.Rule:
-      load_selector_list(&parsed_rule, r)
+      rule := new(Style_Rule, allocator)
+      rule.selectors = make([dynamic]Selector, allocator)
+      rule.declarations = make([dynamic]Declaration, allocator)
+      load_selector_list(rule, r.selectors, sheet, allocator)
+      if r.inner != nil {
+        load_properties(rule, r.inner, allocator)
+      }
+      append(&sheet.rules, rule)
     }
-    
-    append(&sheet.rules, parsed_rule)
   }
 
-  fmt.printfln("%#v", sheet)
-} 
+  return sheet
+}
+
+// === Lookup ===
+
+get_style_from_class :: proc(sheet: ^Style_Sheet, class: string) -> ^Style_Rule {
+  return sheet.classMap[class]
+}
+
+get_style_from_id :: proc(sheet: ^Style_Sheet, id: string) -> ^Style_Rule {
+  return sheet.idMap[id]
+}
+
+get_style_from_element :: proc(sheet: ^Style_Sheet, element: string) -> ^Style_Rule {
+  return sheet.elementMap[element]
+}
+
+// === Matching and merging ===
+
+// Does a single selector match the described node?
+selector_matches :: proc(selector: Selector, tag, id: string, classes: []string) -> bool {
+  switch selector.type {
+  case .Id:
+    return id == selector.name
+  case .Class:
+    for class in classes {
+      if class == selector.name do return true
+    }
+    return false
+  case .Element:
+    return tag == selector.name
+  case .Data:
+    return false
+  }
+  return false
+}
+
+// A rule matches when every one of its selectors matches the node.
+rule_matches :: proc(rule: ^Style_Rule, tag, id: string, classes: []string) -> bool {
+  if len(rule.selectors) == 0 do return false
+  for selector in rule.selectors {
+    if !selector_matches(selector, tag, id, classes) do return false
+  }
+  return true
+}
+
+// Merges every matching rule from every sheet into one clay config.
+//
+// Sheets and rules are visited in the order they were added, so the most
+// recently added matching style overrides the earlier ones.
+merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string) -> (merged: clay.ElementDeclaration, matched: bool) {
+  builder: Style_Builder
+  for sheet in sheets {
+    for rule in sheet.rules {
+      if rule_matches(rule, tag, id, classes) {
+        for declaration in rule.declarations {
+          apply_declaration(&builder, declaration)
+        }
+        matched = true
+      }
+    }
+  }
+  if matched do merged = finalize(builder)
+  return
+}
+
+// Computes the merged style for a node and wraps it in a rule so it can be
+// stored on the dom node. Returns nil when nothing matched, so unstyled nodes
+// keep their default (zero) clay config.
+resolve_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, allocator := context.allocator) -> ^Style_Rule {
+  merged, matched := merge_style(sheets, tag, id, classes)
+  if !matched do return nil
+
+  rule := new(Style_Rule, allocator)
+  rule.properties = merged
+  return rule
+}
