@@ -1,3 +1,10 @@
+/* 
+  Credits to GingerBill and the Odin team.
+  `core:odin/tokenizer` is the reference for making this while learning
+
+  Tokenizer for the .OCSS file format
+*/
+
 package tokenizer
 
 import "core:unicode"
