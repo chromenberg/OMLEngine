@@ -243,10 +243,14 @@ parse_property :: proc(p: ^Parser) -> ^ast.Declaration {
 
 	value := p.cursor               // first value token
 	last := value
+
+	// keep looking until we find a semicolon
+	// or a "}" (if this is found, the stylesheet is malformed)
 	for p.cursor.kind != .Semicolon && p.cursor.kind != .Close_Brace && !at_eof(p) && p.cursor.kind != .Invalid {
 		advance_token(p)
 		last = p.trail
 	}
+	
 	value.text = p.tok.source[value.pos.offset:get_end_pos(last).offset]
 
 	end := last

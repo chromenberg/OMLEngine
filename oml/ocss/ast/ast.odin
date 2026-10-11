@@ -28,9 +28,10 @@ Selector_List :: struct {
 }
 
 Selector_Kind :: enum {
+	Element,
 	Id,
 	Class,
-	Element
+	Data
 }
 
 Grouped_Selector :: struct {

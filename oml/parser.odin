@@ -70,6 +70,7 @@ assemble_document :: proc(xml_doc: ^xml.Document, doc: ^Document) {
 get_xml_node :: proc(xml_doc: ^xml.Document, id: int) -> xml.Element {
   return xml_doc.elements[id]
 }
+
 get_id :: proc(xml_doc: ^xml.Document, index: u32) -> string {
   str, _ :=xml.find_attribute_val_by_key(xml_doc, index, "id")
   fmt.println(str)
@@ -113,7 +114,7 @@ deserialize_classes :: proc(xml_doc: ^xml.Document, doc: ^Document, node: ^Node,
 }
 
 update_tree :: proc(xml_doc: ^xml.Document, doc: ^Document, current: ^Node, id: u32, ident: string) -> ^Node {
-	 new_node := create_node(ident, doc)
+	new_node := create_node(ident, doc)
   new_node.id = get_id(xml_doc, id)
   deserialize_classes(xml_doc, doc, new_node, id)
   new_node.parent = current
@@ -131,6 +132,7 @@ update_tree :: proc(xml_doc: ^xml.Document, doc: ^Document, current: ^Node, id: 
 }
 
 import "ocss/parser"
+import "ocss"
 import_style :: proc(child_node: xml.Element) -> bool {
 	// Halt all parsing of the current OML Document
  	key, src := get_attribute_by_key(child_node, "source")
@@ -141,8 +143,9 @@ import_style :: proc(child_node: xml.Element) -> bool {
   p: parser.Parser
   // p.path = src.(string)
  	parser.parse(&p, src.(string))
-  ast := parser.extract_ast(&p)
+  ocss.create_style_sheet(&p)
   
+  ast := parser.extract_ast(&p)
   parser.format_ast(&ast, {.Simple, .Bars})
   log.infof("Imported %v", src.(string))
   // delete(ast.rules)

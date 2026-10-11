@@ -218,6 +218,7 @@ selector_kind_string :: proc(kind: ast.Selector_Kind) -> string {
 	case .Id:      return "id"
 	case .Class:   return "class"
 	case .Element: return "element"
+	case .Data:    return "data"
 	}
 	return "unknown"
 }
