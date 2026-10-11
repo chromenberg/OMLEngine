@@ -122,6 +122,8 @@ INode :: struct {
   // the style computed by merging every matching ocss rule into this node
   styles: ^ocss.Style_Rule,
   id: string,
+  // the text content of an element (e.g. the body of <text>)
+  text: string,
   // the amount of times this item is referenced by the lua runtime
   refs: int
 }

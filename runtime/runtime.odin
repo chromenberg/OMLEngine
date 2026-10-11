@@ -152,6 +152,8 @@ push_node :: proc(L: ^lua.State, node: ^oml.Node) {
   lua.setfield(L, -2, "id")
   lua_string(L, node.tag)
   lua.setfield(L, -2, "tag")
+  lua_string(L, node.text)
+  lua.setfield(L, -2, "text")
   lua_string(L, node_type_name(node.type))
   lua.setfield(L, -2, "type")
 

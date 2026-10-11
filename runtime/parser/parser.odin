@@ -13,11 +13,11 @@ Error_Handler :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any)
 Parser :: struct {
 	path: string,
 	tok: tokenizer.Tokenizer,
-	
+
 	warn: Warn_Handler,
 	err: Error_Handler,
 	err_count: int,
-	
+
 	prev_token: tokenizer.Token,
 	curr_token: tokenizer.Token,
 
@@ -144,9 +144,9 @@ parse_atom_value :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^
 	is_lhs := lhs
 
 	for loop {
-	
+
 	}
-	
+
 	return operand
 }
 
@@ -170,11 +170,11 @@ parse_unary_expression :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
     case .Add, .Sub:
       op := advance_token(p)
       expression := parse_unary_expression(p, lhs)
-      
+
       unary_expr := ast.new(ast.Unary_Expr, op.pos, expression)
       unary_expr.op = op
       unary_expr.expr = expression
-      
+
       return unary_expr
     // case .Increment, .Decrement:
     //   op := advance_token(p)
@@ -200,7 +200,7 @@ parse_binary_expression :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Exp
       if op_prec != prec {
         break loop
       }
-      
+
       right := parse_binary_expression(p, false, prec+1)
       if right == nil {
         err(p, op.pos, "f")
@@ -252,5 +252,4 @@ parse_file :: proc(p: ^Parser, file: string) -> bool {
     return true
   }
   return false
-} 
-
+}

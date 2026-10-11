@@ -102,6 +102,23 @@ unstyled_nodes_have_no_style :: proc(t: ^testing.T) {
 }
 
 @(test)
+text_content_and_style :: proc(t: ^testing.T) {
+  doc := load_document("tests/text.oml")
+  defer free_document(&doc)
+
+  node := find_node(doc.tree, "hello")
+  testing.expect(t, node != nil, "expected to find #hello")
+  testing.expect_value(t, node.text, "Hello world")
+
+  rule := node.styles
+  testing.expect(t, rule != nil, "expected #hello to be styled")
+  testing.expect_value(t, rule.text.textColor, clay.Color{255, 0, 0, 255})
+  testing.expect_value(t, rule.text.fontSize, u16(24))
+  testing.expect_value(t, rule.text.fontId, u16(3))
+  testing.expect_value(t, rule.text.letterSpacing, u16(1))
+}
+
+@(test)
 imports_are_merged_from_disk :: proc(t: ^testing.T) {
   doc := load_document("tests/test.oml")
   defer free_document(&doc)

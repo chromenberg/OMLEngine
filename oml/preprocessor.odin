@@ -3,14 +3,22 @@ package oml
 import "core:fmt"
 import "shared:clay"
 
+// Fallback text config for text elements that match no stylesheet rule.
+// Styled text elements get theirs from the computed rule (which already fills
+// in the same defaults).
+DEFAULT_TEXT_CONFIG :: clay.TextElementConfig{
+	textColor = clay.Color{40,40,40,255},
+	fontId = 0,
+	fontSize = 16,
+}
+
 build_element :: proc(doc: ^Document, node: ^Node) {
 	switch node.type_id {
 		case TextNode:
-			clay.Text("temporary text", {
-				textColor = clay.Color{40,40,40,255},
-				fontId = 0,
-				fontSize = 16
-			})
+			clay.Text(
+				node.text,
+				node.styles != nil ? node.styles.text : DEFAULT_TEXT_CONFIG
+			)
 		case RectNode:
 			if len(node.id) != 0 {
 

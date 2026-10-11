@@ -1,0 +1,10 @@
+<odin>
+  <head>
+    <link type="style" source="tests/text.ocss" />
+  </head>
+  <body>
+    <rect id="box">
+      <text id="hello">Hello world</text>
+    </rect>
+  </body>
+</odin>

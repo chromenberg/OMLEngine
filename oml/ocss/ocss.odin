@@ -27,8 +27,10 @@ Declaration :: struct {
 Style_Rule :: struct {
   selectors:    [dynamic]Selector,
   declarations: [dynamic]Declaration,
-  // The clay config produced by applying `declarations` in order.
+  // The clay element config produced by applying `declarations` in order.
   properties:   clay.ElementDeclaration,
+  // The clay text config for this rule, used by text elements.
+  text:         clay.TextElementConfig,
 }
 
 // A parsed ocss file: the ocss equivalent of the cssom.
@@ -51,10 +53,24 @@ Style_Sheet :: struct {
 // combined into one axis.
 Style_Builder :: struct {
   layout:     Layout_Builder,
+  text:       Text_Builder,
   background: clay.Color,
   // corner radius in pixels; the renderer converts it to clay/raylib's
   // relative roundness using the element's final bounds
   radius:     f32,
+}
+
+// Text properties are kept apart from the element config because clay takes
+// them in a separate `TextElementConfig`.
+Text_Builder :: struct {
+  color:          clay.Color,
+  has_color:      bool,
+  font_size:      u16,
+  has_font_size:  bool,
+  font_id:        u16,
+  has_font_id:    bool,
+  letter_spacing: u16,
+  line_height:    u16,
 }
 
 Layout_Builder :: struct {
@@ -121,6 +137,7 @@ load_properties :: proc(rule: ^Style_Rule, props: ^ast.Block, allocator := conte
     apply_declaration(&builder, declaration)
   }
   rule.properties = finalize(builder)
+  rule.text = finalize_text(builder)
 }
 
 // Maps one ocss declaration onto the accumulating style builder.
@@ -155,6 +172,27 @@ apply_declaration :: proc(style: ^Style_Builder, declaration: Declaration) {
     if value, ok := parse_length(declaration.value); ok do style.layout.width.max = value
   case "max-height":
     if value, ok := parse_length(declaration.value); ok do style.layout.height.max = value
+
+  // text
+  case "color":
+    if color, ok := parse_color(declaration.value); ok {
+      style.text.color = color
+      style.text.has_color = true
+    }
+  case "font-size":
+    if size, ok := parse_length(declaration.value); ok {
+      style.text.font_size = u16(size)
+      style.text.has_font_size = true
+    }
+  case "font-id":
+    if id, ok := parse_int(declaration.value); ok {
+      style.text.font_id = u16(id)
+      style.text.has_font_id = true
+    }
+  case "letter-spacing":
+    if value, ok := parse_int(declaration.value); ok do style.text.letter_spacing = u16(value)
+  case "line-height":
+    if value, ok := parse_int(declaration.value); ok do style.text.line_height = u16(value)
   }
 }
 
@@ -164,6 +202,27 @@ apply_size :: proc(axis: ^Axis_Builder, value: string) {
   if !ok do return
   axis.type = type
   axis.value = amount
+}
+
+// Defaults for text elements that are styled but set no text property.
+DEFAULT_TEXT_COLOR :: clay.Color{40, 40, 40, 255}
+DEFAULT_TEXT_SIZE  :: u16(16)
+DEFAULT_TEXT_FONT  :: u16(0)
+
+// Bakes the accumulated text properties into a clay text config, filling in
+// defaults for anything the stylesheets did not set.
+finalize_text :: proc(style: Style_Builder) -> clay.TextElementConfig {
+  config := clay.TextElementConfig{
+    textColor = DEFAULT_TEXT_COLOR,
+    fontId    = DEFAULT_TEXT_FONT,
+    fontSize  = DEFAULT_TEXT_SIZE,
+  }
+  if style.text.has_color   do config.textColor = style.text.color
+  if style.text.has_font_size do config.fontSize = style.text.font_size
+  if style.text.has_font_id do config.fontId = style.text.font_id
+  if style.text.letter_spacing != 0 do config.letterSpacing = style.text.letter_spacing
+  if style.text.line_height    != 0 do config.lineHeight = style.text.line_height
+  return config
 }
 
 // Bakes an accumulated builder into a clay element config.
@@ -394,7 +453,7 @@ rule_matches :: proc(rule: ^Style_Rule, tag, id: string, classes: []string) -> b
 //
 // Sheets and rules are visited in the order they were added, so the most
 // recently added matching style overrides the earlier ones.
-merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string) -> (merged: clay.ElementDeclaration, matched: bool) {
+merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string) -> (merged: clay.ElementDeclaration, text: clay.TextElementConfig, matched: bool) {
   builder: Style_Builder
   for sheet in sheets {
     for rule in sheet.rules {
@@ -406,7 +465,10 @@ merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string) 
       }
     }
   }
-  if matched do merged = finalize(builder)
+  if matched {
+    merged = finalize(builder)
+    text = finalize_text(builder)
+  }
   return
 }
 
@@ -414,10 +476,11 @@ merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string) 
 // stored on the dom node. Returns nil when nothing matched, so unstyled nodes
 // keep their default (zero) clay config.
 resolve_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, allocator := context.allocator) -> ^Style_Rule {
-  merged, matched := merge_style(sheets, tag, id, classes)
+  merged, text, matched := merge_style(sheets, tag, id, classes)
   if !matched do return nil
 
   rule := new(Style_Rule, allocator)
   rule.properties = merged
+  rule.text = text
   return rule
 }

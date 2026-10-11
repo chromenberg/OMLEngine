@@ -129,7 +129,7 @@ import lua "vendor:lua/5.4"
 load_scripts :: proc(doc: ^Document) {
   for src in doc.script_imports {
     log.infof("Setting up script import for [%v]", src)
-    script := new(Loaded_Script)
+    script := new(Loaded_Script, doc.allocator)
     script.name = strings.clone_to_cstring(src, doc.allocator)
 
     append(&doc.scripts, script)
@@ -174,6 +174,11 @@ deserialize :: proc(xml_doc: ^xml.Document, doc: ^Document, current: ^Node, curr
   for child in node.value {
     switch v in child {
       case string:
+        // the text content of the current element (e.g. the body of <text>)
+        content := strings.trim_space(v)
+        if len(content) > 0 {
+          current.text = strings.clone(content, doc.allocator)
+        }
       case xml.Element_ID:
         child_id := child.(xml.Element_ID)
         child_node := get_xml_node(xml_doc, child_id)
@@ -237,6 +242,8 @@ parse :: proc(filename: string, doc: ^Document) {
   // Allocate the document collections on the arena so they share its lifetime.
   doc.style_imports = make([dynamic]string, doc.allocator)
   doc.styles = make([dynamic]^ocss.Style_Sheet, doc.allocator)
+  doc.script_imports = make([dynamic]string, doc.allocator)
+  doc.scripts = make([dynamic]^Loaded_Script, doc.allocator)
 
   assemble_document(xml_doc, doc)
 
@@ -244,7 +251,7 @@ parse :: proc(filename: string, doc: ^Document) {
   load_styles(doc)
   merge_styles(doc)
   load_scripts(doc)
-  
-  
+
+
   log.infof("Parsed %v", filename)
 }
