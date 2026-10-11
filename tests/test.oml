@@ -1,6 +1,7 @@
-<odin id="root!">
+<odin>
   <head>
     <link type="style" source="tests/test.ocss" />
+    <script source="test.lua" />
   </head>
   <body>
     <rect id="url_box" class="inputbox">

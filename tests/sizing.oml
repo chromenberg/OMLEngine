@@ -1,0 +1,16 @@
+<odin>
+  <head>
+    <link type="style" source="tests/sizing.ocss" />
+  </head>
+  <body>
+    <rect id="box">
+      <text>box</text>
+    </rect>
+    <rect id="fitted">
+      <text>fitted</text>
+    </rect>
+    <rect id="unstyled">
+      <text>plain</text>
+    </rect>
+  </body>
+</odin>

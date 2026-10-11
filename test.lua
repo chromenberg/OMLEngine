@@ -1,0 +1,6 @@
+local elem = get_element_by_id("url_box")
+print(elem.id)
+print(elem.tag)
+print("first style: ", elem.styles[1])
+print("first class: ",elem.classes[1])
+print("tag of first child: ",elem.children[1].tag)
