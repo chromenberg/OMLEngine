@@ -135,6 +135,117 @@ read_identifier :: proc(t: ^Tokenizer) -> string {
 	return string(t.source[offset:t.offset])
 }
 
+// returns the contents between the start position of a token and the read head pos
+stringify :: proc(t: ^Tokenizer, start_pos: int) -> string {
+  return string(t.source[start_pos:t.offset])
+} 
+
+peek_byte :: proc(t: ^Tokenizer, lookahead := 0) -> byte {
+  // ensure we are reading within the bounds of the source file
+  if t.read_offset+lookahead < len(t.source) {
+    return t.source[t.read_offset+lookahead]
+  }
+  return 0
+}
+
+digit_val :: proc(char: rune) -> int {
+  switch char {
+  case '0'..='9':
+    return int(char-'0')
+  case 'A'..='F':
+    return int(char-'A'+10)
+  case 'a'..='f':
+    return int(char-'a'+10)
+  }
+
+  return 16
+}
+
+scan_number :: proc(t: ^Tokenizer, seen_dec: bool) -> (TOKEN_KIND, string) {
+  scan_mantissa :: proc(t: ^Tokenizer, base: int) {
+    // if the current value is less than the base or is a seperator
+    // then we can keep reading
+    for digit_val(t.current) < base || t.current == '_' {
+      advance_rune(t)
+    }
+  }
+
+  scan_exponent :: proc(t: ^Tokenizer, kind: ^TOKEN_KIND) {
+    if t.current == 'e' || t.current == 'E' {
+      kind^ = .Float
+      advance_rune(t)
+      if t.current == '-' || t.current == '+' {
+        advance_rune(t)
+      }
+      if digit_val(t.current) < 10 {
+        scan_mantissa(t, 10)
+      }
+    }
+  }
+
+  scan_fraction :: proc(t: ^Tokenizer, kind: ^TOKEN_KIND) -> (exit_early: bool) {
+    // have we found 1..?
+    if t.current == '.' && peek_byte(t) == '.' {
+      return true
+    }
+    if t.current == '.' {
+      kind^ =.Float
+      advance_rune(t)
+      scan_mantissa(t, 10)
+    }
+    return false
+  }
+  
+  offset := t.offset
+  kind := TOKEN_KIND.Number
+  seen_point := seen_dec
+  
+  if seen_point {
+    kind = .Float
+    scan_mantissa(t, 10)
+    scan_exponent(t, &kind)
+  } else {
+    //
+    if t.current == '0' {
+      int_base :: proc(t: ^Tokenizer, kind: ^TOKEN_KIND, base: int) {
+        prev := t.offset
+        advance_rune(t)
+        scan_mantissa(t, base)
+        if t.offset - prev <= 1 {
+          kind^ = .Invalid
+        }
+      }
+
+      advance_rune(t)
+      switch t.current {
+      case: // not handling other types for now
+        seen_point = false
+        scan_mantissa(t, 10) // still in base-10
+        
+        if t.current == '.' { // have we found a float?
+          seen_point = true
+          if scan_fraction(t, &kind) {
+            return kind, stringify(t, offset)
+          }
+        }
+
+        scan_exponent(t, &kind)
+        return kind, stringify(t, offset)
+      }
+    }
+  }
+
+  scan_mantissa(t, 10)
+  
+  if scan_fraction(t, &kind) {
+    return kind, stringify(t, offset)
+  }
+
+  scan_exponent(t, &kind)
+
+  return kind, stringify(t, offset)
+}
+
 scan :: proc(t: ^Tokenizer) -> Token {
 	skip_whitespace(t)
 
@@ -150,6 +261,8 @@ scan :: proc(t: ^Tokenizer) -> Token {
 			if text == "rule" {
 				kind = .Rule
 			}
+		case '0' <= current && current <= '9':
+		  kind, text = scan_number(t, false)
 		case:
 			advance_rune(t)
 			switch current {
@@ -157,6 +270,12 @@ scan :: proc(t: ^Tokenizer) -> Token {
 				case '"':
 				  kind = .String
 					text = read_string(t)
+				case '.':
+					kind = .Period
+					switch t.current {
+					case '0'..='9':
+					  kind, text = scan_number(t, true)
+					}
 				case '{': kind = .Open_Brace
 				case '}': kind = .Close_Brace
 				case '(': kind = .Open_Paren
@@ -166,8 +285,6 @@ scan :: proc(t: ^Tokenizer) -> Token {
 				case ';': kind = .Semicolon
 				case ':': kind = .Colon
 					// these need a check
-				case '.':
-					kind = .Period
 				case '#':
 					kind = .Hash
 				case ' ':
