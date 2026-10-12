@@ -127,17 +127,28 @@ INode :: struct {
   id: string,
   // the text content of an element (e.g. the body of <text>)
   text: string,
-  // the amount of times this item is referenced by the lua runtime
-  refs: int,
 
-  // registered event listeners, plus the previous hover state used for
-  // enter/leave edge detection (see events.odin)
-  events:      ^Event_Node,
-  was_hovered: bool
 }
+
+// Holds fields relating to what the garbage collector will track,
+// 
+// if an element has 0 references for long enough then the node will be removed
+// assuming the node has no parents or children
+// 
+// This is mostly not needed right now, as this would be a language-side thing
+GC_Data :: struct {
+	refs: int
+}
+
+Interactable :: struct {
+	event_list: ^Event,
+	hovered: bool,
+} 
 
 Node :: struct {
   using base: INode,
+  events: Interactable,
+  using gc: GC_Data,
   parent: ^Node,
   children: [dynamic]^Node,
   tmp_visited: bool `false`
