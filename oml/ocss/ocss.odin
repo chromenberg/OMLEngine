@@ -52,17 +52,14 @@ Style_Sheet :: struct {
 // `min-width` and `max-width` may arrive from different rules and have to be
 // combined into one axis.
 Style_Builder :: struct {
-  layout:     Layout_Builder,
-  text:       Text_Builder,
+  layout:     Layout,
+  text:       Text,
   background: clay.Color,
-  // corner radius in pixels; the renderer converts it to clay/raylib's
-  // relative roundness using the element's final bounds
+  // radius in pixels, converted to clays system using final bounds
   radius:     f32,
 }
 
-// Text properties are kept apart from the element config because clay takes
-// them in a separate `TextElementConfig`.
-Text_Builder :: struct {
+Text :: struct {
   color:          clay.Color,
   has_color:      bool,
   font_size:      u16,
@@ -73,30 +70,34 @@ Text_Builder :: struct {
   line_height:    u16,
 }
 
-Layout_Builder :: struct {
+Layout :: struct {
   direction: clay.LayoutDirection,
   gap:       u16,
   align_x:   clay.LayoutAlignmentX,
   align_y:   clay.LayoutAlignmentY,
   padding:   clay.Padding,
-  width:     Axis_Builder,
-  height:    Axis_Builder,
+  width:     Sizing_Direction,
+  height:    Sizing_Direction,
 }
 
-Axis_Builder :: struct {
+Sizing_Direction :: struct {
   type:  clay.SizingType,
   // fixed pixels for .Fixed, or a 0..1 fraction for .Percent
   value: f32,
   min:   f32,
   max:   f32,
-  // whether width/height explicitly sized this axis (as opposed to only
-  // min/max being set, or nothing at all)
+  // has an explicit width / height?
   has_value: bool,
 }
 
-// === Selector loading ===
-
-load_selectors :: proc(rule: ^Style_Rule, list: ^ast.Selector_List, sheet: ^Style_Sheet, allocator := context.allocator) {
+// Loads selectors from a selector list and adds them to the selector map
+// 
+load_selectors :: proc(
+	rule: ^Style_Rule,
+	list: ^ast.Selector_List,
+	sheet: ^Style_Sheet,
+	allocator := context.allocator
+) {
   for selector in list.inner {
     #partial switch d in selector.derived {
     case ^ast.Selector:
@@ -106,8 +107,8 @@ load_selectors :: proc(rule: ^Style_Rule, list: ^ast.Selector_List, sheet: ^Styl
       }
       append(&rule.selectors, selec)
 
-      // Index the rule so direct lookups stay cheap. `map_insert` overwrites,
-      // keeping the most recently added rule for a repeated selector.
+      // Depending on the selector type, we insert its name and the style into its respective map
+      // for lookups later
       switch d.kind {
       case .Id:      map_insert(&sheet.idMap, selec.name, rule)
       case .Class:   map_insert(&sheet.classMap, selec.name, rule)
@@ -200,7 +201,7 @@ apply_declaration :: proc(style: ^Style_Builder, declaration: Declaration) {
 }
 
 // Sets the primary sizing of an axis (`width`/`height`).
-apply_size :: proc(axis: ^Axis_Builder, value: string) {
+apply_size :: proc(axis: ^Sizing_Direction, value: string) {
   type, amount, ok := parse_size(value)
   if !ok do return
   axis.type = type
@@ -248,7 +249,7 @@ finalize :: proc(style: Style_Builder, default_grow := false) -> clay.ElementDec
   return config
 }
 
-finalize_axis :: proc(axis: Axis_Builder, default_grow := false) -> clay.SizingAxis {
+finalize_axis :: proc(axis: Sizing_Direction, default_grow := false) -> clay.SizingAxis {
   switch axis.type {
   case .Percent:
     return clay.SizingPercent(axis.value)
@@ -271,7 +272,7 @@ finalize_axis :: proc(axis: Axis_Builder, default_grow := false) -> clay.SizingA
 }
 
 // Applies a css-like padding shorthand (1..4 values, space separated).
-apply_padding :: proc(layout: ^Layout_Builder, value: string) {
+apply_padding :: proc(layout: ^Layout, value: string) {
   parts := strings.fields(value, context.temp_allocator)
   if len(parts) == 0 || len(parts) > 4 do return
 
@@ -484,9 +485,7 @@ merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, 
   return
 }
 
-// Computes the merged style for a node and wraps it in a rule so it can be
-// stored on the dom node. Returns nil when nothing matched, so unstyled nodes
-// keep their default (zero) clay config.
+// computes the nodes merged style and returns it to merge it with the node
 resolve_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, allocator := context.allocator, default_grow := false) -> ^Style_Rule {
   merged, text, matched := merge_style(sheets, tag, id, classes, default_grow)
   if !matched do return nil
