@@ -214,17 +214,14 @@ load_styles :: proc(doc: ^Document) {
   }
 }
 
-// Walks the dom and gives every node the clay config computed by merging all
-// matching stylesheet rules into it.
+// recursively merge the Proto-OCSSOM into the DOM
 merge_styles :: proc(doc: ^Document) {
   if doc.tree == nil do return
   merge_node(doc, doc.tree)
 }
 
 merge_node :: proc(doc: ^Document, node: ^Node) {
-  // The body fills the window unless the stylesheets size it, so its children
-  // can size against the window (and its layout properties take effect).
-  default_grow := node == doc.body
+  default_grow := node == doc.body // if the node is the body, then make it fill screen
   node.styles = ocss.resolve_style(doc.styles[:], node.tag, node.id, node.classes, doc.allocator, default_grow)
 
   for child in node.children {
@@ -242,11 +239,11 @@ parse :: proc(filename: string, doc: ^Document) {
   mem.arena_init(&doc.arena, doc.backing)
   doc.allocator = mem.arena_allocator(&doc.arena)
 
-  // Allocate the document collections on the arena so they share its lifetime.
   doc.style_imports = make([dynamic]string, doc.allocator)
   doc.styles = make([dynamic]^ocss.Style_Sheet, doc.allocator)
   doc.script_imports = make([dynamic]string, doc.allocator)
   doc.scripts = make([dynamic]^Loaded_Script, doc.allocator)
+  // Allocate the document collections on the arena so they share its lifetime.
 
   assemble_document(xml_doc, doc)
 
