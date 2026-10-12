@@ -248,7 +248,7 @@ draw_rect_normal :: proc(x, y, w, h: f32, color: clay.Color) {
 // `h: f32` - Height
 //
 // `radius: f32` - Corner radius
-draw_rect_rounded :: proc(x, y, w, h: f32, radius: f32, color: clay.Color, segments: i32 = 8) {
+draw_rect_rounded :: proc(x, y, w, h: f32, radius: f32, color: clay.Color, segments: i32 = 16) {
   rl.DrawRectangleRounded({x, y, w, h}, radius, segments, clay_to_rl(color))
 }
 
@@ -257,7 +257,7 @@ draw_rect_with_bounds :: proc(bounds: clay.BoundingBox, color: clay.Color) {
 }
 
 // draws a rounded rectangle using the bounding box instead of deconstructed fields
-draw_rect_with_bounds_rounded :: proc(bounds: clay.BoundingBox, radius: f32, color: clay.Color, segments: i32 = 8) {
+draw_rect_with_bounds_rounded :: proc(bounds: clay.BoundingBox, radius: f32, color: clay.Color, segments: i32 = 16) {
   draw_rect(bounds.x, bounds.y, bounds.width, bounds.height, radius, color, segments)
 }
 
@@ -300,7 +300,7 @@ init_renderer :: proc(clay_mem: ^[^]u8) {
 
 	// setup renderer
 
-	rl.SetConfigFlags({.VSYNC_HINT, .WINDOW_RESIZABLE, .MSAA_4X_HINT})
+	rl.SetConfigFlags({.VSYNC_HINT, .WINDOW_HIGHDPI, .WINDOW_RESIZABLE, .MSAA_4X_HINT})
   rl.InitWindow(i32(WindowWidth), i32(WindowHeight), "Erdene")
   rl.SetTargetFPS(rl.GetMonitorRefreshRate(rl.GetCurrentMonitor()))
 
@@ -327,6 +327,7 @@ render :: proc(doc: ^oml.Document) {
 	commands := oml.render(doc, rl.GetFrameTime())
 
 	rl.BeginDrawing()
+  // rl.ClearBackground(clay_to_rl(doc.body.styles.properties.backgroundColor))
   clay_render(&commands)
   rl.EndDrawing()
 }
