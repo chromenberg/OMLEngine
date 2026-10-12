@@ -159,16 +159,16 @@ node_events_register_emit_remove :: proc(t: ^testing.T) {
   }
 
   oml.node_on(node, oml.Event_Kind.Hover, handler, &count, doc.allocator)
-  oml.node_emit(node, oml.Event_Kind.Hover)
-  oml.node_emit(node, oml.Event_Kind.Hover)
+  oml.emit(node, oml.Event_Kind.Hover)
+  oml.emit(node, oml.Event_Kind.Hover)
   testing.expect_value(t, count, 2)
 
   // a different event kind must not fire the hover listener
-  oml.node_emit(node, oml.Event_Kind.Click)
+  oml.emit(node, oml.Event_Kind.Click)
   testing.expect_value(t, count, 2)
 
   oml.node_off(node, oml.Event_Kind.Hover)
-  oml.node_emit(node, oml.Event_Kind.Hover)
+  oml.emit(node, oml.Event_Kind.Hover)
   testing.expect_value(t, count, 2)
 
   // name mapping used by the Lua `on` binding

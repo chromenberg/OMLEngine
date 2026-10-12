@@ -5,18 +5,18 @@ import "shared:clay"
 // Every kind of event a node can emit.
 Event_Kind :: enum {
   Hover,
-  Hover_Enter,
-  Hover_Leave,
+	  Hover_Enter,
+		Hover_Leave,
   Click,
-  Press,
-  Release,
+  	Press,
+   	Release,
 }
 
-Event_Node :: struct {
+Event :: struct {
   kind:      Event_Kind,
   callback:  proc(node: ^Node, user_data: rawptr),
   user_data: rawptr,
-  next:      ^Event_Node, // stored as a linked list
+  next:      ^Event, // stored as a linked list
 }
 
 node_on :: proc(
@@ -26,25 +26,25 @@ node_on :: proc(
   user_data: rawptr,
   allocator := context.allocator,
 ) {
-  entry := new(Event_Node, allocator)
+  entry := new(Event, allocator)
   entry^ = {
     kind      = kind,
     callback  = callback,
     user_data = user_data,
-    next      = node.events,
+    next      = node.events.event_list,
   }
-  node.events = entry
+  node.events.event_list = entry
 }
 
 node_off :: proc(node: ^Node, kind: Event_Kind) {
-  previous: ^Event_Node = nil
-  entry := node.events
+  previous: ^Event = nil
+  entry := node.events.event_list
 
   for entry != nil {
     next := entry.next
     if entry.kind == kind {
       if previous == nil {
-        node.events = next
+        node.events.event_list = next
       } else {
         previous.next = next
       }
@@ -55,9 +55,9 @@ node_off :: proc(node: ^Node, kind: Event_Kind) {
   }
 }
 
-// Fires `kind` on `node`, calling every matching listener.
-node_emit :: proc(node: ^Node, kind: Event_Kind) {
-  entry := node.events
+// loops through all registered events and runs the events callback on those with the matching `Event_Kind`
+emit :: proc(node: ^Node, kind: Event_Kind) {
+  entry := node.events.event_list
   for entry != nil {
     if entry.kind == kind && entry.callback != nil {
       entry.callback(node, entry.user_data)
@@ -83,31 +83,29 @@ event_kind_from_name :: proc(name: string) -> (Event_Kind, bool) {
 // TODO: Made with deepseek for getting a rough idea on HOW i could manage this
 // but not HOW i will do it
 
-// Runs the built-in triggers for the element currently open in clay.
-//
-// Called from the render pass while the element is open, so clay's `Hovered()`
-// and pointer state refer to it. Only nodes that actually have listeners are
-// inspected.
+// dispatches events every tick, this should later be implemented to happen only once when needed
+// 
+// if an event state has changed then we can emit it
 dispatch_events :: proc(node: ^Node) {
-  if node.events == nil do return
+  if node.events.event_list == nil do return
 
   hovered := clay.Hovered()
   pointer := clay.GetPointerState()
 
-  if hovered {
-    node_emit(node, .Hover)
-    if !node.was_hovered do node_emit(node, .Hover_Enter)
+  if hovered { // is the current node hovered?
+    emit(node, .Hover) // if so, emit that we are hovered - this fires every tick
+    if !node.events.hovered do emit(node, .Hover_Enter)
 
     #partial switch pointer.state {
     case .PressedThisFrame:
-      node_emit(node, .Press)
-      node_emit(node, .Click)
+      emit(node, .Press)
+      emit(node, .Click)
     case .ReleasedThisFrame:
-      node_emit(node, .Release)
+      emit(node, .Release)
     }
-  } else if node.was_hovered {
-    node_emit(node, .Hover_Leave)
+  } else if node.events.hovered {
+    emit(node, .Hover_Leave)
   }
 
-  node.was_hovered = hovered
+  node.events.hovered = hovered
 }
