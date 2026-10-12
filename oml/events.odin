@@ -69,12 +69,12 @@ emit :: proc(node: ^Node, kind: Event_Kind) {
 // Maps a script event name to a kind.
 event_kind_from_name :: proc(name: string) -> (Event_Kind, bool) {
   switch name {
-  case "hover":       return .Hover, true
-  case "hover_enter": return .Hover_Enter, true
-  case "hover_leave": return .Hover_Leave, true
-  case "click":       return .Click, true
-  case "press":       return .Press, true
-  case "release":     return .Release, true
+  case "mouse:over":       return .Hover, true
+  case "mouse:over.enter": return .Hover_Enter, true
+  case "mouse:over.leave": return .Hover_Leave, true
+  case "mouse:click":       return .Click, true
+  case "mouse:down":       return .Press, true
+  case "mouse:up":     return .Release, true
   }
   return .Hover, false
 }

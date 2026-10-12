@@ -317,7 +317,7 @@ update_data :: proc() {
   WindowHeight = f32(rl.GetScreenHeight())
 
   clay.SetPointerState(
-    transmute(clay.Vector2)rl.GetMousePosition(),
+    rl.GetMousePosition(),
     rl.IsMouseButtonDown(rl.MouseButton.LEFT)
   )
   clay.SetLayoutDimensions({WindowWidth, WindowHeight})

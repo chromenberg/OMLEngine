@@ -1,5 +1,6 @@
 package main
 import "oml"
+import "core:os"
 import "core:log"
 import "core:mem"
 import "core:fmt"
@@ -12,6 +13,9 @@ WindowScale : Vector2 = {640, 480}
 WindowWidth := WindowScale[0]
 WindowHeight := WindowScale[1]
 
+DIR := ""
+NAME := ""
+
 
 load_font :: proc(fontId: u16, fontSize: u16, path: cstring) {
 	assign_at(
@@ -22,7 +26,7 @@ load_font :: proc(fontId: u16, fontSize: u16, path: cstring) {
   			path,
   			cast(i32)fontSize * 2, nil, 0
   		),
-  		fontID = cast(u16)fontId
+  		fontID = fontId
   	}
 	)
 
@@ -31,8 +35,15 @@ load_font :: proc(fontId: u16, fontSize: u16, path: cstring) {
 		raylib.TextureFilter.BILINEAR
 	)
 }
-
+set_dir :: proc() {
+	DIR, NAME = os.split_path(os.args[1])
+	os.set_working_directory(DIR)
+}
 main :: proc() {
+	if len(os.args) < 2 {
+		return 
+	}
+	set_dir()
 	context.logger = log.create_console_logger()
 	when ODIN_DEBUG {
 		track: mem.Tracking_Allocator
@@ -54,8 +65,8 @@ main :: proc() {
 
   doc : oml.Document
   doc.backing = make([]byte, 256*1024)
-  oml.parse("erdene.oml", &doc)
-  
+  oml.parse(NAME, &doc)
+
   script.init_oml_runtime(&doc)
   defer delete(doc.backing)
   defer free_all(doc.allocator)
