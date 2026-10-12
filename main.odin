@@ -17,31 +17,17 @@ DIR := ""
 NAME := ""
 
 
-load_font :: proc(fontId: u16, fontSize: u16, path: cstring) {
-	assign_at(
-  	&raylib_fonts,
-  	fontId,
-  	RL_Font{
-  	  font = raylib.LoadFontEx(
-  			path,
-  			cast(i32)fontSize * 2, nil, 0
-  		),
-  		fontID = fontId
-  	}
-	)
 
-	raylib.SetTextureFilter(
-	  raylib_fonts[fontId].font.texture,
-		raylib.TextureFilter.BILINEAR
-	)
-}
+
 set_dir :: proc() {
 	DIR, NAME = os.split_path(os.args[1])
 	os.set_working_directory(DIR)
 }
+
+
 main :: proc() {
 	if len(os.args) < 2 {
-		return 
+		return
 	}
 	set_dir()
 	context.logger = log.create_console_logger()
@@ -63,26 +49,33 @@ main :: proc() {
 		}
 	}
 
-  doc : oml.Document
-  doc.backing = make([]byte, 256*1024)
-  oml.parse(NAME, &doc)
-
-  script.init_oml_runtime(&doc)
-  defer delete(doc.backing)
-  defer free_all(doc.allocator)
-  defer script.close_runtimes(&doc)
-
   memory:= make([^]u8, layout_engine_min_memory())
-
   defer free(memory)
-
   init_renderer(&memory)
 
-  defer delete(raylib_fonts)
+  doc := new(oml.Document)
+  set_measure_document(doc)
+  defer free(doc)
+  
+  doc.backing = make([]byte, 256*1024)
+  defer delete(doc.backing)
+  defer free_all(doc.allocator)
+  
+  oml.parse(NAME, doc)
+  script.init_oml_runtime(doc)
+  defer script.close_runtimes(doc)
 
   for !raylib.WindowShouldClose() {
   	defer free_all(context.temp_allocator)
 		update_data()
-		render(&doc)
+		render(doc)
   }
+
+  fmt.println("Deallocating before program exit")
+  free_all(context.allocator)
+  free_all(context.temp_allocator)
+}
+
+nuke :: proc(doc: ^oml.Document) {
+ 
 }

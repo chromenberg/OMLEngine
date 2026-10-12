@@ -5,6 +5,7 @@ import lua "vendor:lua/5.4"
 import "core:mem"
 import "base:runtime"
 import "ocss"
+import "vendor:raylib"
 
 NodeType :: enum {
   Root,
@@ -190,10 +191,21 @@ Document :: struct {
   styles: [dynamic]^ocss.Style_Sheet,
 
   script_imports: [dynamic]string,
-  scripts: [dynamic]^Loaded_Script
+  scripts: [dynamic]^Loaded_Script,
+
+  font_imports: [dynamic]^RL_Font,
+  fonts: [dynamic]^RL_Font
 }
 
 Loaded_Script :: struct {
   name: cstring,
   lua_state: ^lua.State
+}
+
+RL_Font :: struct {
+  fontID: u16,
+  fontSize: u16,
+  weight: string,
+  source: string,
+  font: raylib.Font
 }

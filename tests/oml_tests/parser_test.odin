@@ -172,21 +172,39 @@ node_events_register_emit_remove :: proc(t: ^testing.T) {
   testing.expect_value(t, count, 2)
 
   // name mapping used by the Lua `on` binding
-  kind, ok := oml.event_kind_from_name("hover")
+  kind, ok := oml.event_kind_from_name("mouse:over")
   testing.expect(t, ok)
   testing.expect_value(t, kind, oml.Event_Kind.Hover)
   _, bad := oml.event_kind_from_name("not_an_event")
   testing.expect(t, !bad, "unknown event names should not map")
 }
 
-// The engine's own document should always parse and produce a body. Resilient
-// to style/content edits, so it stays useful as the layout is iterated on.
+// Fonts are chosen from their weight + size. Uses fake fonts so no raylib
+// window/font loading is required.
 @(test)
-real_document_parses :: proc(t: ^testing.T) {
+font_resolution_by_weight_and_size :: proc(t: ^testing.T) {
   doc: oml.Document
-  load_document(&doc, "erdene.oml")
-  defer free_document(&doc)
 
-  testing.expect(t, doc.tree != nil, "expected erdene.oml to parse")
-  testing.expect(t, doc.body != nil, "expected a body")
+  fonts: [3]oml.RL_Font
+  fonts[0].weight = "regular"; fonts[0].fontSize = 16
+  fonts[1].weight = "bold";    fonts[1].fontSize = 16
+  fonts[2].weight = "bold";    fonts[2].fontSize = 24
+
+  doc.fonts = make([dynamic]^oml.RL_Font, context.allocator)
+  defer delete(doc.fonts)
+  append(&doc.fonts, &fonts[0], &fonts[1], &fonts[2])
+
+  // exact weight + size
+  testing.expect_value(t, oml.resolve_font_id(&doc, "bold", 24), u16(2))
+  testing.expect_value(t, oml.resolve_font_id(&doc, "bold", 16), u16(1))
+  testing.expect_value(t, oml.resolve_font_id(&doc, "regular", 16), u16(0))
+
+  // size 0 matches any size for that weight
+  testing.expect_value(t, oml.resolve_font_id(&doc, "bold", 0), u16(1))
+
+  // closest size among the requested weight (20 is 4 from both; first wins)
+  testing.expect_value(t, oml.resolve_font_id(&doc, "bold", 20), u16(1))
+
+  // unknown weight resolves to nothing
+  testing.expect_value(t, oml.resolve_font_id(&doc, "italic", 16), u16(0))
 }

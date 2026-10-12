@@ -3,27 +3,28 @@ package main
 import "core:c"
 import "core:strings"
 import "core:math"
+import "base:runtime"
 import rl "vendor:raylib"
 import "shared:clay"
 import "oml"
 
-RL_Font :: struct {
-  fontID: u16,
-  font: rl.Font
-}
-
-raylib_fonts := [dynamic]RL_Font{}
-
-// steal code from the clay_odin example because im too lazy
+// The measure callback receives the document as userData (set via
+// `set_measure_document`), so it can resolve the font the text was styled with.
 measure_text_ascii :: proc "c" (text: clay.StringSlice, config: ^clay.TextElementConfig, userData: rawptr) -> clay.Dimensions {
-	line_width: f32 = 0
+	context = runtime.default_context()
+	doc := cast(^oml.Document)userData
+	font := oml.get_font_by_id(doc, config.fontId)
 
-	font := raylib_fonts[config.fontId].font
 	text_str := string(text.chars[:text.length])
 
+	// no font loaded for that id: return a rough estimate so layout still runs
+	if font.baseSize == 0 {
+		return {width = f32(len(text_str)) * f32(config.fontSize) * 0.5, height = f32(config.fontSize)}
+	}
+
+	line_width: f32 = 0
 	for i in 0 ..< len(text_str) {
 		glyph_index := text_str[i] - 32
-
 		glyph := font.glyphs[glyph_index]
 
 		if glyph.advanceX != 0 {
@@ -34,18 +35,20 @@ measure_text_ascii :: proc "c" (text: clay.StringSlice, config: ^clay.TextElemen
 	}
 
 	scaleFactor := f32(config.fontSize) / f32(font.baseSize)
-
-	// Note:
-	//   I'd expect this to be `len(text_str) - 1`,
-	//   but that seems to be one letterSpacing too small
-	//   maybe that's a raylib bug, maybe that's Clay?
 	total_spacing := f32(len(text_str)) * f32(config.letterSpacing)
 
 	return {width = line_width * scaleFactor + total_spacing, height = f32(config.fontSize)}
 }
 
+// Point text measurement at a parsed document so it can resolve fonts by id.
+// Call once after `oml.parse` and before the first frame.
+set_measure_document :: proc(doc: ^oml.Document) {
+	clay.SetMeasureTextFunction(measure_text_ascii, cast(rawptr)doc)
+}
+
 clay_render :: proc(
   commands: ^clay.ClayArray(clay.RenderCommand),
+  doc: ^oml.Document,
   allocator := context.temp_allocator
 ) {
   overlay_colors := make([dynamic]clay.Color, allocator)
@@ -59,9 +62,10 @@ clay_render :: proc(
         config := render_command.renderData.rectangle
 
         if is_rounded(config.cornerRadius) {
+          radius: f32 = (config.cornerRadius.topLeft * 2) / min(bounds.width, bounds.height)
           draw_rect(
             bounds,
-            config.cornerRadius.topLeft,
+            radius,
             config.backgroundColor
           )
         } else {
@@ -79,8 +83,9 @@ clay_render :: proc(
         // raylib uses cstrings, clay does not
         cstr_text := strings.clone_to_cstring(text, allocator)
 
+        font := oml.get_font_by_id(doc, config.fontId)
         rl.DrawTextEx(
-          raylib_fonts[config.fontId].font,
+          font,
           cstr_text,
           {bounds.x, bounds.y},
           f32(config.fontSize),
@@ -90,53 +95,53 @@ clay_render :: proc(
       case .Border:
   			config := render_command.renderData.border
   			// Left border
-  			// if config.width.left > 0 {
-  			// 	draw_rect(
-  			// 		bounds.x,
-  			// 		bounds.y + config.cornerRadius.topLeft,
-  			// 		f32(config.width.left),
-  			// 		bounds.height - config.cornerRadius.topLeft - config.cornerRadius.bottomLeft,
-  			// 		config.color,
-  			// 	)
-  			// }
-  			// // Right border
-  			// if config.width.right > 0 {
-  			// 	draw_rect(
-  			// 		bounds.x + bounds.width - f32(config.width.right),
-  			// 		bounds.y + config.cornerRadius.topRight,
-  			// 		f32(config.width.right),
-  			// 		bounds.height - config.cornerRadius.topRight - config.cornerRadius.bottomRight,
-  			// 		config.color,
-  			// 	)
-  			// }
-  			// // Top border
-  			// if config.width.top > 0 {
-  			// 	draw_rect(
-  			// 		bounds.x + (config.cornerRadius.topLeft),
-  			// 		bounds.y,
-  			// 		bounds.width - config.cornerRadius.topLeft - config.cornerRadius.topRight,
-  			// 		f32(config.width.top),
-  			// 		config.color,
-  			// 	)
-  			// }
-  			// // Bottom border
-  			// if config.width.bottom > 0 {
-  			// 	draw_rect(
-  			// 		bounds.x + config.cornerRadius.bottomLeft,
-  			// 		bounds.y + bounds.height - f32(config.width.bottom),
-  			// 		bounds.width - config.cornerRadius.bottomLeft - config.cornerRadius.bottomRight,
-  			// 		f32(config.width.bottom),
-  			// 		config.color,
-  			// 	)
-  			// }
+  			if config.width.left > 0 {
+  				draw_rect(
+  					bounds.x,
+  					bounds.y + config.cornerRadius.topLeft,
+  					f32(config.width.left),
+  					bounds.height - config.cornerRadius.topLeft - config.cornerRadius.bottomLeft,
+  					config.color,
+  				)
+  			}
+  			// Right border
+  			if config.width.right > 0 {
+  				draw_rect(
+  					bounds.x + bounds.width - f32(config.width.right),
+  					bounds.y + config.cornerRadius.topRight,
+  					f32(config.width.right),
+  					bounds.height - config.cornerRadius.topRight - config.cornerRadius.bottomRight,
+  					config.color,
+  				)
+  			}
+  			// Top border
+  			if config.width.top > 0 {
+  				draw_rect(
+  					bounds.x + (config.cornerRadius.topLeft),
+  					bounds.y,
+  					bounds.width - config.cornerRadius.topLeft - config.cornerRadius.topRight,
+  					f32(config.width.top),
+  					config.color,
+  				)
+  			}
+  			// Bottom border
+  			if config.width.bottom > 0 {
+  				draw_rect(
+  					bounds.x + config.cornerRadius.bottomLeft,
+  					bounds.y + bounds.height - f32(config.width.bottom),
+  					bounds.width - config.cornerRadius.bottomLeft - config.cornerRadius.bottomRight,
+  					f32(config.width.bottom),
+  					config.color,
+  				)
+  			}
 
   			// Rounded Borders
   			if config.cornerRadius.topLeft > 0 {
   				draw_arc(
-  					bounds.x + (bounds.height*config.cornerRadius.topLeft),
-  					bounds.y + (config.cornerRadius.topLeft/bounds.width),
-  					((bounds.width*config.cornerRadius.topLeft) - f32(config.width.top)),
-  					bounds.height*config.cornerRadius.topLeft,
+  					bounds.x + config.cornerRadius.topLeft,
+  					bounds.y + config.cornerRadius.topLeft,
+  					config.cornerRadius.topLeft - f32(config.width.top),
+  					config.cornerRadius.topLeft,
   					180,
   					270,
   					config.color,
@@ -175,10 +180,9 @@ clay_render :: proc(
   					config.color,
   				)
   			}
-      case .OverlayColorStart:
+  		case .OverlayColorStart:
   			config := render_command.renderData.overlayColor
   			append(&overlay_colors, config.color)
-
   		case .OverlayColorEnd:
   			pop(&overlay_colors)
     }
@@ -278,7 +282,7 @@ error_handler :: proc "c" (data: clay.ErrorData) {
 
 
 FONT_PATH :: "./resources/"
-FONT_PRIMARY :: FONT_PATH + "Quicksand-Semibold.ttf"
+FONT_PRIMARY :: FONT_PATH + "Figtree.ttf"
 
 layout_engine_min_memory :: proc() -> c.size_t {
 	return cast(c.size_t)clay.MinMemorySize()
@@ -304,12 +308,6 @@ init_renderer :: proc(clay_mem: ^[^]u8) {
   rl.InitWindow(i32(WindowWidth), i32(WindowHeight), "Erdene")
   rl.SetTargetFPS(rl.GetMonitorRefreshRate(rl.GetCurrentMonitor()))
 
-  load_font(0, 8,  FONT_PRIMARY)
-  load_font(1, 12, FONT_PRIMARY)
-  load_font(2, 16,  FONT_PRIMARY)
-  load_font(3, 24, FONT_PRIMARY)
-  load_font(4, 32, FONT_PRIMARY)
-
 }
 
 update_data :: proc() {
@@ -328,6 +326,6 @@ render :: proc(doc: ^oml.Document) {
 
 	rl.BeginDrawing()
   // rl.ClearBackground(clay_to_rl(doc.body.styles.properties.backgroundColor))
-  clay_render(&commands)
+  	clay_render(&commands, doc)
   rl.EndDrawing()
 }

@@ -314,7 +314,7 @@ parse :: proc(p: ^Parser, file: string, allocator := context.allocator) {
 
   p.doc = make([dynamic]^ast.Node, p.allocator)
 
-  tokenizer.init(&p.tok,file)
+  tokenizer.init(&p.tok, file, p.allocator)
   if p.tok.current <= 0 {
     // tokenizer is still tokenizing or failed to complete and set cursor to -1
     // fmt.println("still tokenizing")

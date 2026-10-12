@@ -16,7 +16,6 @@ import "core:os"
 import "core:mem"
 
 Tokenizer :: struct {
-	allocator: mem.Allocator,
 	file: string,
 	source: string,
 
@@ -299,31 +298,23 @@ scan :: proc(t: ^Tokenizer) -> Token {
 	}
 
 	token := Token{kind, text, pos}
-	if token.kind != .Invalid {
-		append(&t.tokens, token)
-	}
+
 
 	return token
 }
 
-init :: proc(t: ^Tokenizer, source: Maybe(string)) {
-	fmt.println("init")
+init :: proc(t: ^Tokenizer, source: Maybe(string), allocator := context.allocator) {
   if source != nil {
     t.file = source.(string)
   }
   t.current = ' '
-  file_bytes, read_err := os.read_entire_file(t.file, context.allocator)
-	defer delete(file_bytes)
+  file_bytes, read_err := os.read_entire_file(t.file, allocator)
 
-	file_data := strings.clone_from_bytes(file_bytes, context.allocator)
-	// defer delete(file_data)
-
-	t.source = file_data
+	t.source = strings.clone_from_bytes(file_bytes, allocator)
 
 	advance_rune(t)
 	if t.current == utf8.RUNE_BOM {
 		advance_rune(t)
 	}
-	fmt.println("finished")
 
 }

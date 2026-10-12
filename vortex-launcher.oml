@@ -1,0 +1,74 @@
+<odin>
+  <head>
+    <link type="style" source="vortex.ocss" />
+    <link type="font" weight="bold" source="./resources/Figtree-Bold.ttf"/>
+    <script source="launcher.lua" />
+  </head>
+  <body>
+    <rect id="root">
+      <rect class="launcherContainer">
+        <rect class="appHeader">
+          
+        </rect>
+        <rect class="appContainer">
+          <rect class="sidebarContainer">
+            <rect class="sidebarItem">
+              <text class="textSubheader">Home</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Profile</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Friends</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Catalog</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Inventory</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Avatar</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Groups</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Settings</text>
+            </rect>
+
+          </rect>
+          <rect class="appContent">
+    
+              <rect class="welcomeContainer">
+                <rect class="avatarContainer">
+                  
+                </rect>
+                <rect class="avatarDecoContainer">
+                  <rect class="welcomeContents">
+                    <text class="textHeader">Hello, raine!</text>
+                  </rect>
+                  <rect class="friendsListContainer">
+                    <text class="textSubheader">Friends</text>
+                    <rect class="friendsList">
+                      <rect class="friendContainer"/>
+                      <rect class="friendContainer"/>
+                      <rect class="friendContainer"/>
+                      <rect class="friendContainer"/>
+                      <rect class="friendContainer"/>
+                    </rect>
+                  </rect>
+                </rect>
+                  
+              </rect>
+              <rect>
+  
+              </rect>
+           
+          </rect>
+        </rect>
+      </rect>
+    </rect>
+  </body>
+</odin>
+

@@ -55,8 +55,14 @@ Style_Builder :: struct {
   layout:     Layout,
   text:       Text,
   background: clay.Color,
+  border: Border,
   // radius in pixels, converted to clays system using final bounds
   radius:     f32,
+}
+
+Border :: struct {
+  width: clay.BorderWidth,
+  color: clay.Color
 }
 
 Text :: struct {
@@ -68,6 +74,7 @@ Text :: struct {
   has_font_id:    bool,
   letter_spacing: u16,
   line_height:    u16,
+  weight: string,
 }
 
 Layout :: struct {
@@ -91,7 +98,7 @@ Sizing_Direction :: struct {
 }
 
 // Loads selectors from a selector list and adds them to the selector map
-// 
+//
 load_selectors :: proc(
 	rule: ^Style_Rule,
 	list: ^ast.Selector_List,
@@ -176,7 +183,12 @@ apply_declaration :: proc(style: ^Style_Builder, declaration: Declaration) {
     if value, ok := parse_length(declaration.value); ok do style.layout.width.max = value
   case "max-height":
     if value, ok := parse_length(declaration.value); ok do style.layout.height.max = value
-
+  case "border-color":
+    if color, ok := parse_color(declaration.value); ok {
+      style.border.color = color
+    }
+  case "border-width":
+    apply_border_width(&style.border, declaration.value)
   // text
   case "color":
     if color, ok := parse_color(declaration.value); ok {
@@ -189,10 +201,13 @@ apply_declaration :: proc(style: ^Style_Builder, declaration: Declaration) {
       style.text.has_font_size = true
     }
   case "font-id":
+    // explicit override; skips weight/size resolution
     if id, ok := parse_int(declaration.value); ok {
       style.text.font_id = u16(id)
       style.text.has_font_id = true
     }
+  case "font-weight":
+    style.text.weight = declaration.value
   case "letter-spacing":
     if value, ok := parse_int(declaration.value); ok do style.text.letter_spacing = u16(value)
   case "line-height":
@@ -214,9 +229,17 @@ DEFAULT_TEXT_COLOR :: clay.Color{40, 40, 40, 255}
 DEFAULT_TEXT_SIZE  :: u16(16)
 DEFAULT_TEXT_FONT  :: u16(0)
 
+// Lets ocss ask the engine to turn a requested font weight + size into a
+// concrete font id. ocss does not know which fonts are loaded, so the engine
+// (which owns them) supplies the lookup. `size == 0` means "any size".
+Font_Resolver :: struct {
+  resolve:   proc(user_data: rawptr, weight: string, size: u16) -> u16,
+  user_data: rawptr,
+}
+
 // Bakes the accumulated text properties into a clay text config, filling in
 // defaults for anything the stylesheets did not set.
-finalize_text :: proc(style: Style_Builder) -> clay.TextElementConfig {
+finalize_text :: proc(style: Style_Builder, resolver: Font_Resolver = {}) -> clay.TextElementConfig {
   config := clay.TextElementConfig{
     textColor = DEFAULT_TEXT_COLOR,
     fontId    = DEFAULT_TEXT_FONT,
@@ -224,7 +247,15 @@ finalize_text :: proc(style: Style_Builder) -> clay.TextElementConfig {
   }
   if style.text.has_color   do config.textColor = style.text.color
   if style.text.has_font_size do config.fontSize = style.text.font_size
-  if style.text.has_font_id do config.fontId = style.text.font_id
+
+  // an explicit font-id wins; otherwise resolve the requested weight + size
+  if style.text.has_font_id {
+    config.fontId = style.text.font_id
+  } else if resolver.resolve != nil {
+    requested_size := style.text.has_font_size ? style.text.font_size : u16(0)
+    config.fontId = resolver.resolve(resolver.user_data, style.text.weight, requested_size)
+  }
+
   if style.text.letter_spacing != 0 do config.letterSpacing = style.text.letter_spacing
   if style.text.line_height    != 0 do config.lineHeight = style.text.line_height
   return config
@@ -244,6 +275,8 @@ finalize :: proc(style: Style_Builder, default_grow := false) -> clay.ElementDec
   config.layout.sizing.width = finalize_axis(style.layout.width, default_grow)
   config.layout.sizing.height = finalize_axis(style.layout.height, default_grow)
   config.backgroundColor = style.background
+  config.border.color = style.border.color
+  config.border.width = style.border.width
   // pixels; the renderer converts to roundness once the bounds are known
   config.cornerRadius = clay.CornerRadiusAll(style.radius)
   return config
@@ -269,6 +302,49 @@ finalize_axis :: proc(axis: Sizing_Direction, default_grow := false) -> clay.Siz
     return clay.SizingFit({min = axis.min, max = axis.max})
   }
   return clay.SizingFit()
+}
+
+// Applies a css-like padding shorthand (1..4 values, space separated).
+apply_border_width :: proc(layout: ^Border, value: string) {
+  parts := strings.fields(value, context.temp_allocator)
+  if len(parts) == 0 || len(parts) > 4 do return
+
+  values: [4]int
+  for part, i in parts {
+    v, ok := parse_int(part)
+    if !ok do return
+    values[i] = v
+  }
+
+  padding: clay.BorderWidth
+  switch len(parts) {
+  case 1:
+    // all edges
+    padding.top    = u16(values[0])
+    padding.right  = u16(values[0])
+    padding.bottom = u16(values[0])
+    padding.left   = u16(values[0])
+  case 2:
+    // block | inline
+    padding.top    = u16(values[0])
+    padding.bottom = u16(values[0])
+    padding.left   = u16(values[1])
+    padding.right  = u16(values[1])
+  case 3:
+    // top | inline | bottom
+    padding.top    = u16(values[0])
+    padding.left   = u16(values[1])
+    padding.right  = u16(values[1])
+    padding.bottom = u16(values[2])
+  case:
+    // top | right | bottom | left
+    padding.top    = u16(values[0])
+    padding.right  = u16(values[1])
+    padding.bottom = u16(values[2])
+    padding.left   = u16(values[3])
+  }
+  padding.betweenChildren = 0
+  layout.width = padding
 }
 
 // Applies a css-like padding shorthand (1..4 values, space separated).
@@ -312,6 +388,7 @@ apply_padding :: proc(layout: ^Layout, value: string) {
   }
   layout.padding = padding
 }
+
 
 // === Value parsing ===
 
@@ -395,7 +472,7 @@ create_style_sheet :: proc(p: ^parser.Parser, allocator := context.allocator) ->
   sheet.name = strings.clone(p.tok.file, allocator)
   sheet.path = strings.clone(p.tok.file, allocator)
 
-  
+
   sheet.rules = make([dynamic]^Style_Rule, allocator)
   sheet.idMap = make(map[string]^Style_Rule, allocator)
   sheet.classMap = make(map[string]^Style_Rule, allocator)
@@ -458,7 +535,7 @@ rule_matches :: proc(rule: ^Style_Rule, tag, id: string, classes: []string) -> b
   return true
 }
 
-merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, default_grow := false) -> (merged: clay.ElementDeclaration, text: clay.TextElementConfig, matched: bool) {
+merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, default_grow := false, resolver: Font_Resolver = {}) -> (merged: clay.ElementDeclaration, text: clay.TextElementConfig, matched: bool) {
   builder: Style_Builder
   for sheet in sheets {
     for rule in sheet.rules {
@@ -472,14 +549,14 @@ merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, 
   }
   if matched {
     merged = finalize(builder, default_grow)
-    text = finalize_text(builder)
+    text = finalize_text(builder, resolver)
   }
   return
 }
 
 // computes the nodes merged style and returns it to merge it with the node
-resolve_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, allocator := context.allocator, default_grow := false) -> ^Style_Rule {
-  merged, text, matched := merge_style(sheets, tag, id, classes, default_grow)
+resolve_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, allocator := context.allocator, default_grow := false, resolver: Font_Resolver = {}) -> ^Style_Rule {
+  merged, text, matched := merge_style(sheets, tag, id, classes, default_grow, resolver)
   if !matched do return nil
 
   rule := new(Style_Rule, allocator)
