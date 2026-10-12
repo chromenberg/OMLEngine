@@ -89,6 +89,9 @@ Axis_Builder :: struct {
   value: f32,
   min:   f32,
   max:   f32,
+  // whether width/height explicitly sized this axis (as opposed to only
+  // min/max being set, or nothing at all)
+  has_value: bool,
 }
 
 // === Selector loading ===
@@ -202,6 +205,7 @@ apply_size :: proc(axis: ^Axis_Builder, value: string) {
   if !ok do return
   axis.type = type
   axis.value = amount
+  axis.has_value = true
 }
 
 // Defaults for text elements that are styled but set no text property.
@@ -226,21 +230,25 @@ finalize_text :: proc(style: Style_Builder) -> clay.TextElementConfig {
 }
 
 // Bakes an accumulated builder into a clay element config.
-finalize :: proc(style: Style_Builder) -> clay.ElementDeclaration {
+//
+// `default_grow`, when true, makes an axis that was left entirely unset fill
+// its parent instead of shrink-wrapping. Used for the body, which should span
+// the window unless the stylesheets size it explicitly.
+finalize :: proc(style: Style_Builder, default_grow := false) -> clay.ElementDeclaration {
   config: clay.ElementDeclaration
   config.layout.layoutDirection = style.layout.direction
   config.layout.childGap = style.layout.gap
   config.layout.childAlignment = {x = style.layout.align_x, y = style.layout.align_y}
   config.layout.padding = style.layout.padding
-  config.layout.sizing.width = finalize_axis(style.layout.width)
-  config.layout.sizing.height = finalize_axis(style.layout.height)
+  config.layout.sizing.width = finalize_axis(style.layout.width, default_grow)
+  config.layout.sizing.height = finalize_axis(style.layout.height, default_grow)
   config.backgroundColor = style.background
   // pixels; the renderer converts to roundness once the bounds are known
   config.cornerRadius = clay.CornerRadiusAll(style.radius)
   return config
 }
 
-finalize_axis :: proc(axis: Axis_Builder) -> clay.SizingAxis {
+finalize_axis :: proc(axis: Axis_Builder, default_grow := false) -> clay.SizingAxis {
   switch axis.type {
   case .Percent:
     return clay.SizingPercent(axis.value)
@@ -253,6 +261,10 @@ finalize_axis :: proc(axis: Axis_Builder) -> clay.SizingAxis {
   case .Grow:
     return clay.SizingGrow({min = axis.min, max = axis.max})
   case .Fit:
+    // nothing set on this axis and no constraints: fill the parent when asked
+    if default_grow && !axis.has_value && axis.min == 0 && axis.max == 0 {
+      return clay.SizingGrow()
+    }
     return clay.SizingFit({min = axis.min, max = axis.max})
   }
   return clay.SizingFit()
@@ -453,7 +465,7 @@ rule_matches :: proc(rule: ^Style_Rule, tag, id: string, classes: []string) -> b
 //
 // Sheets and rules are visited in the order they were added, so the most
 // recently added matching style overrides the earlier ones.
-merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string) -> (merged: clay.ElementDeclaration, text: clay.TextElementConfig, matched: bool) {
+merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, default_grow := false) -> (merged: clay.ElementDeclaration, text: clay.TextElementConfig, matched: bool) {
   builder: Style_Builder
   for sheet in sheets {
     for rule in sheet.rules {
@@ -466,7 +478,7 @@ merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string) 
     }
   }
   if matched {
-    merged = finalize(builder)
+    merged = finalize(builder, default_grow)
     text = finalize_text(builder)
   }
   return
@@ -475,8 +487,8 @@ merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string) 
 // Computes the merged style for a node and wraps it in a rule so it can be
 // stored on the dom node. Returns nil when nothing matched, so unstyled nodes
 // keep their default (zero) clay config.
-resolve_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, allocator := context.allocator) -> ^Style_Rule {
-  merged, text, matched := merge_style(sheets, tag, id, classes)
+resolve_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, allocator := context.allocator, default_grow := false) -> ^Style_Rule {
+  merged, text, matched := merge_style(sheets, tag, id, classes, default_grow)
   if !matched do return nil
 
   rule := new(Style_Rule, allocator)

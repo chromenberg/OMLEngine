@@ -25,14 +25,17 @@ build_element :: proc(doc: ^Document, node: ^Node) {
 				if clay.UI(clay.ID(node.id))(
 				  node.styles != nil ? node.styles.properties : {}
 				) {
+    		  // dispatch then render
+					dispatch_events(node)
 					render_traverse(doc, node)
 				}
 
 			} else {
 
 				if clay.UI()(
-					node.styles != nil ? node.styles.properties : {}
+				  node.styles != nil ? node.styles.properties : {}
 				) {
+					dispatch_events(node)
 					render_traverse(doc, node)
 				}
 
@@ -51,8 +54,27 @@ render_traverse :: proc(doc: ^Document, node: ^Node) {
 	}
 }
 
+render_body :: proc(doc: ^Document) {
+	body := doc.body
+	if body == nil do return
+
+	config: clay.ElementDeclaration
+	if body.styles != nil {
+		config = body.styles.properties
+	} else {
+		// no rule matched the body: still fill the window
+		config.layout.sizing = {clay.SizingGrow(), clay.SizingGrow()}
+	}
+
+	if clay.UI()(config) {
+	  // dispatch then render
+		dispatch_events(body)
+		render_traverse(doc, body)
+	}
+}
+
 render :: proc(doc: ^Document, delta: f32) -> clay.ClayArray(clay.RenderCommand) {
 	clay.BeginLayout()
-	render_traverse(doc, doc.body)
+	render_body(doc)
 	return clay.EndLayout(delta)
 }

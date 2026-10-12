@@ -1,6 +1,15 @@
-local elem = get_element_by_id("url_box")
-print(elem.id)
-print(elem.tag)
-print("first style: ", elem.styles[1])
-print("first class: ",elem.classes[1])
-print("tag of first child: ",elem.children[1].tag)
+local elem = get_element_by_id("button")
+
+elem:on("hover_enter", function()
+  print("hovered over")
+end)
+
+
+elem:on("hover_leave", function()
+  print("not hovered")
+end)
+
+
+elem:on("click", function()
+  print("click")
+end)

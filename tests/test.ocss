@@ -1,6 +1,0 @@
-rule (#url_box) {
-	background-color: #f43366;
-	corner-radius:5;
-	height: 23;
-	
-}

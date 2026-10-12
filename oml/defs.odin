@@ -1,5 +1,6 @@
 package oml
 // The type of a node as parsed in an OML document
+import "shared:clay"
 import lua "vendor:lua/5.4"
 import "core:mem"
 import "base:runtime"
@@ -101,12 +102,14 @@ StyleData :: struct {
 
 NodeStyle :: struct {
   class_name: string,
-  // A pointer to the style data computed after the ocss trees were merged into
-  // the dom. Style info is shared, so this is a pointer and may stay nil until
-  // the merge completes (or forever, when no rule matches).
   data: ^ocss.Style_Rule
 }
 
+Event_Proc :: #type proc "c" (id: clay.ElementId, pointerData: clay.PointerData, userData: rawptr)
+
+Events :: struct {
+  onHover: Event_Proc
+}
 
 INode :: struct {
   // The type of the node according to the node enum
@@ -125,7 +128,12 @@ INode :: struct {
   // the text content of an element (e.g. the body of <text>)
   text: string,
   // the amount of times this item is referenced by the lua runtime
-  refs: int
+  refs: int,
+
+  // registered event listeners, plus the previous hover state used for
+  // enter/leave edge detection (see events.odin)
+  events:      ^Event_Node,
+  was_hovered: bool
 }
 
 Node :: struct {

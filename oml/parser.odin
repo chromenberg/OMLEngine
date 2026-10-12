@@ -222,7 +222,10 @@ merge_styles :: proc(doc: ^Document) {
 }
 
 merge_node :: proc(doc: ^Document, node: ^Node) {
-  node.styles = ocss.resolve_style(doc.styles[:], node.tag, node.id, node.classes, doc.allocator)
+  // The body fills the window unless the stylesheets size it, so its children
+  // can size against the window (and its layout properties take effect).
+  default_grow := node == doc.body
+  node.styles = ocss.resolve_style(doc.styles[:], node.tag, node.id, node.classes, doc.allocator, default_grow)
 
   for child in node.children {
     merge_node(doc, child)

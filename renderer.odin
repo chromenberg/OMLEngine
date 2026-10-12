@@ -61,7 +61,7 @@ clay_render :: proc(
         if is_rounded(config.cornerRadius) {
           draw_rect(
             bounds,
-            corner_roundness(config.cornerRadius.topLeft, bounds),
+            config.cornerRadius.topLeft,
             config.backgroundColor
           )
         } else {
@@ -190,14 +190,6 @@ is_rounded :: proc(radius: clay.CornerRadius) -> bool {
          radius.bottomRight > 0 ||
          radius.topLeft     > 0 ||
          radius.topRight    > 0
-}
-
-// ocss styles a corner radius in pixels, but clay/raylib express roundness
-// relative to half of the shortest side, so convert using the final bounds.
-corner_roundness :: proc(radius: f32, bounds: clay.BoundingBox) -> f32 {
-  shortest := min(bounds.width, bounds.height)
-  if shortest <= 0 do return 0
-  return math.clamp(radius * 2 / shortest, 0, 1)
 }
 
 @(private="file", require_results)

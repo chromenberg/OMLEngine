@@ -4,7 +4,7 @@ import "core:log"
 import "core:mem"
 import "core:fmt"
 import "vendor:raylib"
-import script "runtime"
+import script "oml/runtime"
 
 Vector2 :: raylib.Vector2
 
@@ -53,30 +53,25 @@ main :: proc() {
 	}
 
   doc : oml.Document
-  // The dom, the parsed stylesheets and their merged styles all live in this
-  // arena, so give it enough room for the whole document.
   doc.backing = make([]byte, 256*1024)
-  oml.parse("./tests/test.oml", &doc)
+  oml.parse("erdene.oml", &doc)
+  
   script.init_oml_runtime(&doc)
-
-  
-  
-  fmt.printfln("%#v", oml.get_element_by_id(&doc, "url_bar"))
-  
   defer delete(doc.backing)
   defer free_all(doc.allocator)
   defer script.close_runtimes(&doc)
 
   memory:= make([^]u8, layout_engine_min_memory())
-  
+
   defer free(memory)
-  
+
   init_renderer(&memory)
-  
+
   defer delete(raylib_fonts)
 
   for !raylib.WindowShouldClose() {
   	defer free_all(context.temp_allocator)
+		update_data()
 		render(&doc)
   }
 }

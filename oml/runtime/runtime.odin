@@ -5,15 +5,11 @@ import "base:runtime"
 import "core:fmt"
 import "shared:clay"
 import lua "vendor:lua/5.4"
-import oml "../oml"
+import oml "../"
 
-// Odin string -> Lua string. Ids/tags/classes are not NUL terminated, so use
-// pushlstring (pushstring would read past the end).
 lua_string :: proc(L: ^lua.State, s: string) {
   lua.pushlstring(L, cast(cstring)raw_data(s), c.size_t(len(s)))
 }
-
-// === enum -> readable name helpers ===
 
 node_type_name :: proc(t: oml.NodeType) -> string {
   switch t {
@@ -65,8 +61,6 @@ sizing_type_name :: proc(t: clay.SizingType) -> string {
   }
   return "fit"
 }
-
-// === value pushers (each leaves exactly ONE value on the stack) ===
 
 push_string_array :: proc(L: ^lua.State, values: []string) {
   lua.newtable(L)
@@ -141,11 +135,73 @@ push_styles :: proc(L: ^lua.State, node: ^oml.Node) {
   push_axis(L, props.layout.sizing.height); lua.setfield(L, -2, "height")
 }
 
+Lua_Event_Binding :: struct {
+  lua_state: ^lua.State,
+  func_ref:  c.int,
+  node:      ^oml.Node,
+  doc:       ^oml.Document,
+}
+
+invoke_lua_handler :: proc(node: ^oml.Node, user_data: rawptr) {
+  binding := cast(^Lua_Event_Binding)user_data // user data is a ptr to the bind
+  if binding == nil do return
+
+  L := binding.lua_state // bindings state
+  lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(binding.func_ref)) // push callback to stack
+  push_node(L, node, binding.doc)                                  // push callback args
+  if lua.pcall(L, 1, 0, 0) != 0 {
+    fmt.eprintfln("lua event error: %s", lua.tostring(L, -1))
+    lua.pop(L, 1)
+  }
+}
+
+// element:on("hover", function() ... end)
+node_on_cfunc :: proc "c" (L: ^lua.State) -> c.int {
+  context = runtime.default_context()
+
+  node := cast(^oml.Node)lua.touserdata(L, lua.REGISTRYINDEX - 1)
+  doc  := cast(^oml.Document)lua.touserdata(L, lua.REGISTRYINDEX - 2)
+  if node == nil || doc == nil {
+    lua.pushboolean(L, b32(false))
+    return 1
+  }
+
+  name := string(lua.L_checkstring(L, 2)) // event name
+  kind, ok := oml.event_kind_from_name(name)
+  if !ok {
+    fmt.eprintfln("lua: unknown event %q", name)
+    lua.pushboolean(L, b32(false))
+    return 1
+  }
+
+  if lua.type(L, 3) != lua.TFUNCTION { // function
+    fmt.eprintfln("lua: on(%q, ...) expects a function", name)
+    lua.pushboolean(L, b32(false))
+    return 1
+  }
+
+  // gc doesnt collect this
+  lua.pushvalue(L, 3)
+  func_ref := lua.L_ref(L, lua.REGISTRYINDEX)
+
+  binding := new(Lua_Event_Binding, doc.allocator)
+  binding^ = {
+    lua_state = L,
+    func_ref  = func_ref,
+    node      = node,
+    doc       = doc,
+  }
+  oml.node_on(node, kind, invoke_lua_handler, binding, doc.allocator)
+
+  lua.pushboolean(L, b32(true))
+  return 1
+}
+
 // Converts a whole node (and its subtree) into a Lua table.
 //
 // `parent` is exposed as an opaque light-userdata handle rather than a table, so
 // building the tree can never recurse back into a cycle.
-push_node :: proc(L: ^lua.State, node: ^oml.Node) {
+push_node :: proc(L: ^lua.State, node: ^oml.Node, doc: ^oml.Document) {
   lua.newtable(L) // [t]
 
   lua_string(L, node.id)
@@ -175,13 +231,19 @@ push_node :: proc(L: ^lua.State, node: ^oml.Node) {
   // children, recursively
   lua.newtable(L)
   for child, i in node.children {
-    push_node(L, child)
+    push_node(L, child, doc)
     lua.rawseti(L, -2, lua.Integer(i + 1))
   }
   lua.setfield(L, -2, "children")
 
   push_styles(L, node)
   lua.setfield(L, -2, "styles")
+
+  // methods: element:on(event, fn)
+  lua.pushlightuserdata(L, node) // upvalue 1
+  lua.pushlightuserdata(L, doc)  // upvalue 2
+  lua.pushcclosure(L, node_on_cfunc, 2)
+  lua.setfield(L, -2, "on")
 }
 
 // Lua: local n = get_element_by_id("url_box"); print(n.id, n.children[1].tag)
@@ -199,7 +261,7 @@ get_element_by_id :: proc "c" (L: ^lua.State) -> c.int {
     return 1
   }
 
-  push_node(L, node)
+  push_node(L, node, doc)
   return 1
 }
 
