@@ -4,7 +4,9 @@ rule (#url_box) {
 	height: 23;
 	
 }
-
+rule (body) {
+	background-color: #14121C;
+}
 rule (.buttonText) {
   color: #ff0000;
 }

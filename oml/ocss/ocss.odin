@@ -352,6 +352,7 @@ parse_size :: proc(value: string) -> (type: clay.SizingType, amount: f32, ok: bo
   return .Fixed, length, true
 }
 
+
 parse_hex_byte :: proc(text: string) -> (u8, bool) {
   value, ok := strconv.parse_int(text, 16)
   if !ok do return 0, false
@@ -388,15 +389,13 @@ parse_color :: proc(value: string) -> (clay.Color, bool) {
   return {}, false
 }
 
-// === Stylesheet construction ===
 
-// Builds a standalone stylesheet from a parsed ocss file.
 create_style_sheet :: proc(p: ^parser.Parser, allocator := context.allocator) -> ^Style_Sheet {
   sheet := new(Style_Sheet, allocator)
   sheet.name = strings.clone(p.tok.file, allocator)
   sheet.path = strings.clone(p.tok.file, allocator)
-  // Explicitly bind the collections to the passed allocator, otherwise the
-  // first append/map_insert would silently fall back to context.allocator.
+
+  
   sheet.rules = make([dynamic]^Style_Rule, allocator)
   sheet.idMap = make(map[string]^Style_Rule, allocator)
   sheet.classMap = make(map[string]^Style_Rule, allocator)
@@ -419,7 +418,6 @@ create_style_sheet :: proc(p: ^parser.Parser, allocator := context.allocator) ->
   return sheet
 }
 
-// === Lookup ===
 
 get_style_from_class :: proc(sheet: ^Style_Sheet, class: string) -> ^Style_Rule {
   return sheet.classMap[class]
@@ -433,9 +431,7 @@ get_style_from_element :: proc(sheet: ^Style_Sheet, element: string) -> ^Style_R
   return sheet.elementMap[element]
 }
 
-// === Matching and merging ===
 
-// Does a single selector match the described node?
 selector_matches :: proc(selector: Selector, tag, id: string, classes: []string) -> bool {
   switch selector.type {
   case .Id:
@@ -462,10 +458,6 @@ rule_matches :: proc(rule: ^Style_Rule, tag, id: string, classes: []string) -> b
   return true
 }
 
-// Merges every matching rule from every sheet into one clay config.
-//
-// Sheets and rules are visited in the order they were added, so the most
-// recently added matching style overrides the earlier ones.
 merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, default_grow := false) -> (merged: clay.ElementDeclaration, text: clay.TextElementConfig, matched: bool) {
   builder: Style_Builder
   for sheet in sheets {
