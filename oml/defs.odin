@@ -13,6 +13,8 @@ NodeType :: enum {
   Link,
   Body,
   Rect,
+  Image,
+  Script,
   Text,
   Button,
   InputBox,
@@ -170,21 +172,17 @@ LinkNode :: struct {
   link_type: LinkNodeType,
   source: string
 }
-
+ImageNode :: struct {
+  using node: Node,
+  data: ^[]byte,
+  source: string,
+  cache_source: string
+}
 StyleClass :: NodeStyle
 // A style id is still referenced by a name and style data, so we can go off the class data
 StyleId :: StyleClass
 
-// Contains the parsed version of an OML document
-Document :: struct {
-  arena     : mem.Arena,
-  allocator : runtime.Allocator,
-  backing   : []byte,
-  // All nodes parsed from an OML file
-  tree : ^Node,
-  body : ^Node,
-  head : ^Node,
-
+Imports :: struct {
   // queued ocss imports
   style_imports: [dynamic]string,
   // ocss styles
@@ -194,7 +192,23 @@ Document :: struct {
   scripts: [dynamic]^Loaded_Script,
 
   font_imports: [dynamic]^RL_Font,
-  fonts: [dynamic]^RL_Font
+  fonts: [dynamic]^RL_Font,
+
+  images: map[string]^[]byte
+}
+
+// Contains the parsed version of an OML document
+Document :: struct {
+  using imports: Imports,
+  arena     : mem.Arena,
+  allocator : runtime.Allocator,
+  backing   : []byte,
+  // All nodes parsed from an OML file
+  tree : ^Node,
+  body : ^Node,
+  head : ^Node,
+
+ 
 }
 
 Loaded_Script :: struct {

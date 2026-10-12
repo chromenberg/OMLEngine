@@ -46,6 +46,155 @@ set_measure_document :: proc(doc: ^oml.Document) {
 	clay.SetMeasureTextFunction(measure_text_ascii, cast(rawptr)doc)
 }
 
+render_clip_start :: proc(render_command: ^clay.RenderCommand, bounds: clay.BoundingBox) {
+	rl.BeginScissorMode(i32(math.round(bounds.x)), i32(math.round(bounds.y)), i32(math.round(bounds.width)), i32(math.round(bounds.height)))
+}
+
+render_clip_end :: proc(render_command: ^clay.RenderCommand, bounds: clay.BoundingBox) {
+  rl.EndScissorMode()
+}
+
+render_border :: proc(render_command: ^clay.RenderCommand, bounds: clay.BoundingBox) {
+  config := render_command.renderData.border
+		// Left border
+		if config.width.left > 0 {
+			draw_rect(
+				bounds.x,
+				bounds.y + config.cornerRadius.topLeft,
+				f32(config.width.left),
+				bounds.height - config.cornerRadius.topLeft - config.cornerRadius.bottomLeft,
+				config.color,
+			)
+		}
+		// Right border
+		if config.width.right > 0 {
+			draw_rect(
+				bounds.x + bounds.width - f32(config.width.right),
+				bounds.y + config.cornerRadius.topRight,
+				f32(config.width.right),
+				bounds.height - config.cornerRadius.topRight - config.cornerRadius.bottomRight,
+				config.color,
+			)
+		}
+		// Top border
+		if config.width.top > 0 {
+			draw_rect(
+				bounds.x + (config.cornerRadius.topLeft),
+				bounds.y,
+				bounds.width - config.cornerRadius.topLeft - config.cornerRadius.topRight,
+				f32(config.width.top),
+				config.color,
+			)
+		}
+		// Bottom border
+		if config.width.bottom > 0 {
+			draw_rect(
+				bounds.x + config.cornerRadius.bottomLeft,
+				bounds.y + bounds.height - f32(config.width.bottom),
+				bounds.width - config.cornerRadius.bottomLeft - config.cornerRadius.bottomRight,
+				f32(config.width.bottom),
+				config.color,
+			)
+		}
+
+		// Rounded Borders
+		if config.cornerRadius.topLeft > 0 {
+			draw_arc(
+				bounds.x + config.cornerRadius.topLeft,
+				bounds.y + config.cornerRadius.topLeft,
+				config.cornerRadius.topLeft - f32(config.width.top),
+				config.cornerRadius.topLeft,
+				180,
+				270,
+				config.color,
+			)
+		}
+		if config.cornerRadius.topRight > 0 {
+			draw_arc(
+				bounds.x + bounds.width - config.cornerRadius.topRight,
+				bounds.y + config.cornerRadius.topRight,
+				config.cornerRadius.topRight - f32(config.width.top),
+				config.cornerRadius.topRight,
+				270,
+				360,
+				config.color,
+			)
+		}
+		if config.cornerRadius.bottomLeft > 0 {
+			draw_arc(
+				bounds.x + config.cornerRadius.bottomLeft,
+				bounds.y + bounds.height - config.cornerRadius.bottomLeft,
+				config.cornerRadius.bottomLeft - f32(config.width.top),
+				config.cornerRadius.bottomLeft,
+				90,
+				180,
+				config.color,
+			)
+		}
+		if config.cornerRadius.bottomRight > 0 {
+			draw_arc(
+				bounds.x + bounds.width - config.cornerRadius.bottomRight,
+				bounds.y + bounds.height - config.cornerRadius.bottomRight,
+				config.cornerRadius.bottomRight - f32(config.width.bottom),
+				config.cornerRadius.bottomRight,
+				0.1,
+				90,
+				config.color,
+			)
+		}
+}
+render_text :: proc(doc: ^oml.Document, render_command: ^clay.RenderCommand, bounds: clay.BoundingBox) {
+  config := render_command.renderData.text
+
+  // get the text up to the length of the string, because c sucks and ends all strings with \n
+  text := string(config.stringContents.chars[:config.stringContents.length])
+
+  // raylib uses cstrings, clay does not
+  cstr_text := strings.clone_to_cstring(text, context.temp_allocator)
+
+  font := oml.get_font_by_id(doc, config.fontId)
+  rl.DrawTextEx(
+    font,
+    cstr_text,
+    {bounds.x, bounds.y},
+    f32(config.fontSize),
+    f32(config.letterSpacing),
+    clay_to_rl(config.textColor)
+  )
+}
+render_rect :: proc(render_command: ^clay.RenderCommand, bounds: clay.BoundingBox) {
+  config := render_command.renderData.rectangle
+
+  if is_rounded(config.cornerRadius) {
+    radius: f32 = (config.cornerRadius.topLeft * 2) / min(bounds.width, bounds.height)
+    draw_rect(
+      bounds,
+      radius,
+      config.backgroundColor
+    )
+  } else {
+    draw_rect(
+      bounds,
+      config.backgroundColor
+    )
+  }
+}
+
+render_image :: proc(overlay_colors: ^[dynamic]clay.Color, render_command: ^clay.RenderCommand, bounds: clay.BoundingBox) {
+  config := render_command.renderData.image
+	tint: clay.Color
+	if len(overlay_colors) > 0 {
+		tint = overlay_colors[len(overlay_colors) - 1]
+	}
+	if tint == 0 {
+		tint = {255, 255, 255, 255}
+	}
+
+	imageTexture := (^rl.Texture2D)(config.imageData)
+	rl.DrawTextureEx(imageTexture^, {bounds.x, bounds.y}, 0, bounds.width / f32(imageTexture.width), clay_to_rl(tint))
+}
+
+
 clay_render :: proc(
   commands: ^clay.ClayArray(clay.RenderCommand),
   doc: ^oml.Document,
@@ -58,128 +207,14 @@ clay_render :: proc(
 
     #partial switch render_command.commandType {
       case .None:
+      case .Image:
+        render_image(&overlay_colors, render_command, bounds)
       case .Rectangle:
-        config := render_command.renderData.rectangle
-
-        if is_rounded(config.cornerRadius) {
-          radius: f32 = (config.cornerRadius.topLeft * 2) / min(bounds.width, bounds.height)
-          draw_rect(
-            bounds,
-            radius,
-            config.backgroundColor
-          )
-        } else {
-          draw_rect(
-            bounds,
-            config.backgroundColor
-          )
-        }
+        render_rect(render_command, bounds)
       case .Text:
-        config := render_command.renderData.text
-
-        // get the text up to the length of the string, because c sucks and ends all strings with \n
-        text := string(config.stringContents.chars[:config.stringContents.length])
-
-        // raylib uses cstrings, clay does not
-        cstr_text := strings.clone_to_cstring(text, allocator)
-
-        font := oml.get_font_by_id(doc, config.fontId)
-        rl.DrawTextEx(
-          font,
-          cstr_text,
-          {bounds.x, bounds.y},
-          f32(config.fontSize),
-          f32(config.letterSpacing),
-          clay_to_rl(config.textColor)
-        )
+        render_text(doc, render_command, bounds)
       case .Border:
-  			config := render_command.renderData.border
-  			// Left border
-  			if config.width.left > 0 {
-  				draw_rect(
-  					bounds.x,
-  					bounds.y + config.cornerRadius.topLeft,
-  					f32(config.width.left),
-  					bounds.height - config.cornerRadius.topLeft - config.cornerRadius.bottomLeft,
-  					config.color,
-  				)
-  			}
-  			// Right border
-  			if config.width.right > 0 {
-  				draw_rect(
-  					bounds.x + bounds.width - f32(config.width.right),
-  					bounds.y + config.cornerRadius.topRight,
-  					f32(config.width.right),
-  					bounds.height - config.cornerRadius.topRight - config.cornerRadius.bottomRight,
-  					config.color,
-  				)
-  			}
-  			// Top border
-  			if config.width.top > 0 {
-  				draw_rect(
-  					bounds.x + (config.cornerRadius.topLeft),
-  					bounds.y,
-  					bounds.width - config.cornerRadius.topLeft - config.cornerRadius.topRight,
-  					f32(config.width.top),
-  					config.color,
-  				)
-  			}
-  			// Bottom border
-  			if config.width.bottom > 0 {
-  				draw_rect(
-  					bounds.x + config.cornerRadius.bottomLeft,
-  					bounds.y + bounds.height - f32(config.width.bottom),
-  					bounds.width - config.cornerRadius.bottomLeft - config.cornerRadius.bottomRight,
-  					f32(config.width.bottom),
-  					config.color,
-  				)
-  			}
-
-  			// Rounded Borders
-  			if config.cornerRadius.topLeft > 0 {
-  				draw_arc(
-  					bounds.x + config.cornerRadius.topLeft,
-  					bounds.y + config.cornerRadius.topLeft,
-  					config.cornerRadius.topLeft - f32(config.width.top),
-  					config.cornerRadius.topLeft,
-  					180,
-  					270,
-  					config.color,
-  				)
-  			}
-  			if config.cornerRadius.topRight > 0 {
-  				draw_arc(
-  					bounds.x + bounds.width - config.cornerRadius.topRight,
-  					bounds.y + config.cornerRadius.topRight,
-  					config.cornerRadius.topRight - f32(config.width.top),
-  					config.cornerRadius.topRight,
-  					270,
-  					360,
-  					config.color,
-  				)
-  			}
-  			if config.cornerRadius.bottomLeft > 0 {
-  				draw_arc(
-  					bounds.x + config.cornerRadius.bottomLeft,
-  					bounds.y + bounds.height - config.cornerRadius.bottomLeft,
-  					config.cornerRadius.bottomLeft - f32(config.width.top),
-  					config.cornerRadius.bottomLeft,
-  					90,
-  					180,
-  					config.color,
-  				)
-  			}
-  			if config.cornerRadius.bottomRight > 0 {
-  				draw_arc(
-  					bounds.x + bounds.width - config.cornerRadius.bottomRight,
-  					bounds.y + bounds.height - config.cornerRadius.bottomRight,
-  					config.cornerRadius.bottomRight - f32(config.width.bottom),
-  					config.cornerRadius.bottomRight,
-  					0.1,
-  					90,
-  					config.color,
-  				)
-  			}
+   			render_border(render_command, bounds)
   		case .OverlayColorStart:
   			config := render_command.renderData.overlayColor
   			append(&overlay_colors, config.color)

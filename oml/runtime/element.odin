@@ -17,6 +17,8 @@ node_type_name :: proc(t: oml.NodeType) -> string {
   case .Root:     return "root"
   case .Head:     return "head"
   case .Link:     return "link"
+  case .Image:    return "img"
+  case .Script:   return "script"
   case .Body:     return "body"
   case .Rect:     return "rect"
   case .Text:     return "text"

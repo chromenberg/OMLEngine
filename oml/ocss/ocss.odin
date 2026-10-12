@@ -55,6 +55,7 @@ Style_Builder :: struct {
   layout:     Layout,
   text:       Text,
   background: clay.Color,
+  image_url: string,
   border: Border,
   // radius in pixels, converted to clays system using final bounds
   radius:     f32,
@@ -212,6 +213,8 @@ apply_declaration :: proc(style: ^Style_Builder, declaration: Declaration) {
     if value, ok := parse_int(declaration.value); ok do style.text.letter_spacing = u16(value)
   case "line-height":
     if value, ok := parse_int(declaration.value); ok do style.text.line_height = u16(value)
+  case "image-url":
+    
   }
 }
 
@@ -255,7 +258,7 @@ finalize_text :: proc(style: Style_Builder, resolver: Font_Resolver = {}) -> cla
     requested_size := style.text.has_font_size ? style.text.font_size : u16(0)
     config.fontId = resolver.resolve(resolver.user_data, style.text.weight, requested_size)
   }
-
+  config.wrapMode = .Words
   if style.text.letter_spacing != 0 do config.letterSpacing = style.text.letter_spacing
   if style.text.line_height    != 0 do config.lineHeight = style.text.line_height
   return config
@@ -535,6 +538,7 @@ rule_matches :: proc(rule: ^Style_Rule, tag, id: string, classes: []string) -> b
   return true
 }
 
+// TODO: Remove param spam holy shit this fucking sucks
 merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, default_grow := false, resolver: Font_Resolver = {}) -> (merged: clay.ElementDeclaration, text: clay.TextElementConfig, matched: bool) {
   builder: Style_Builder
   for sheet in sheets {

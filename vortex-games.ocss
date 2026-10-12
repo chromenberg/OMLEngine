@@ -1,0 +1,44 @@
+rule (.gamesListContainer) {
+  height: grow;
+  direction: column;
+}
+
+rule (.gameCategories) {
+  direction: column;
+  gap: 48;
+}
+
+rule (.gameCategory) {
+  gap: 8;
+  direction: column;
+}
+
+rule (.categoryNameContainer) {
+  padding: 8 0 8 0;
+}
+
+rule (.gameScroller) {
+  width: grow;
+  gap: 16;
+  
+}
+
+rule (.gameIcon) {
+  width: grow;
+  height: 150;
+  background-color: #26263a;
+  border-width: 1;
+  border-color: #33334a;
+  corner-radius: 8;
+}
+
+rule (.gameName) {
+  
+}
+
+rule (.gameContainer) {
+  direction: column;
+  width: 150;
+  height: 200;
+  gap: 12;
+}

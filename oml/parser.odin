@@ -15,7 +15,7 @@ import "vendor:raylib"
 load_font :: proc(doc: ^Document, font: ^RL_Font) {
   font.font = raylib.LoadFontEx(
     strings.clone_to_cstring(font.source, doc.allocator),
-		cast(i32)font.fontSize*6, nil, 0
+		cast(i32)font.fontSize*cast(i32)font.fontSize, nil, 0
 	)
 
 	assign_at(
@@ -90,7 +90,7 @@ create_node :: proc(type: string, doc: ^Document) -> ^Node {
   new_node.tag = strings.clone(type, doc.allocator)
 
   switch type {
-    case "odin":
+    case "odin", "html":
       new_node.type = .Root
       new_node.has_children = true
       new_node.type_id = RootNode
@@ -106,11 +106,19 @@ create_node :: proc(type: string, doc: ^Document) -> ^Node {
       new_node.type = .Link
       new_node.has_children = false
       new_node.type_id = LinkNode
-    case "rect":
+    case "script":
+      new_node.type = .Script
+      new_node.has_children = false
+      new_node.type_id = Node
+    case "img":
+      new_node.type = .Image
+      new_node.has_children = false
+      new_node.type_id = ImageNode
+    case "rect", "div":
       new_node.type = .Rect
       new_node.has_children = true
       new_node.type_id = RectNode
-    case "text":
+    case "text", "p":
       new_node.type = .Text
       new_node.has_children = true
       new_node.type_id = TextNode
@@ -311,8 +319,8 @@ deserialize :: proc(xml_doc: ^xml.Document, doc: ^Document, current: ^Node, curr
   }
 }
 
-FONT_SIZE_COUNTS :: 16
-FONT_SIZES : [FONT_SIZE_COUNTS]u16 = {8, 10, 12, 14, 16, 24, 28, 32, 36, 48, 52, 56, 64, 72, 96, 128}
+FONT_SIZE_COUNTS :: 17
+FONT_SIZES : [FONT_SIZE_COUNTS]u16 = {8, 10, 12, 14, 16, 22, 24, 28, 32, 36, 48, 52, 56, 64, 72, 96, 128}
 
 load_fonts :: proc(doc: ^Document) {
   log.infof("Loading fonts. Queue Length: %d", len(doc.font_imports))
@@ -358,7 +366,7 @@ merge_node :: proc(doc: ^Document, node: ^Node) {
   // the engine owns the loaded fonts, so it resolves ocss font requests
   resolver := ocss.Font_Resolver{ resolve = resolve_font_id_cb, user_data = doc }
   node.styles = ocss.resolve_style(doc.styles[:], node.tag, node.id, node.classes, doc.allocator, default_grow, resolver)
-
+  
   for child in node.children {
     merge_node(doc, child)
   }

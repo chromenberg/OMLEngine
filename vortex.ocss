@@ -10,6 +10,12 @@ rule (.launcherContainer) {
   direction: column;
 }
 
+rule (.textNormal) {
+  font-size: 22;
+  color: #ffffff;
+  font-weight: semibold;
+}
+
 rule (.textSubheader) {
   font-size: 24;
   color: #ffffff;
@@ -37,6 +43,8 @@ rule (.appContent) {
   height: grow;
   corner-radius: 8;
   padding: 32;
+  direction: column;
+  gap: 16;
 }
 
 rule (.welcomeContainer) {
@@ -49,6 +57,10 @@ rule (.avatarContainer) {
   height: 250;
   border-color: #24242f;
   border-width: 1;
+}
+
+rule (#image-test) {
+ image-url: "./resources/game.webp";
 }
 
 rule (.avatarDecoContainer) {
