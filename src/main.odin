@@ -15,7 +15,11 @@ Document :: struct {
 	// inner data of the docs arena allocator
 	_arena: ^mem.Dynamic_Arena,
 	// store the event loop in the doc?
-	event_loop: nbio.Event_Loop
+	event_loop: nbio.Event_Loop,
+	
+	file: File,
+	loaded_scripts: nil,
+	loaded_styles: nil
 }
 
 File :: struct {

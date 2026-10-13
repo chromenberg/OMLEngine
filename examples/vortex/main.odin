@@ -26,11 +26,13 @@ main :: proc() {
 	}
 
 	doc: oml.Document
+	doc.file.src = "examples/vortex/resources/pages/vortex-launcher.oml"
+	
 	oml.start_event_loop()
 	defer oml.close_event_loop()
 
 	oml.init(&doc)
 	defer oml.clean_doc(&doc)
 
-	
+	oml.schedule()
 }
