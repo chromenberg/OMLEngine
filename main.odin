@@ -54,22 +54,30 @@ main :: proc() {
   init_renderer(&memory)
 
   doc := new(oml.Document)
+  doc.loader = new(oml.Loader)
+  
   set_measure_document(doc)
   defer free(doc)
-  
+
   doc.backing = make([]byte, 256*1024)
   defer delete(doc.backing)
   defer free_all(doc.allocator)
-  
+  // background image downloads
+  oml.loader_init(doc.loader)
+
   oml.parse(NAME, doc)
   script.init_oml_runtime(doc)
   defer script.close_runtimes(doc)
 
+
   for !raylib.WindowShouldClose() {
   	defer free_all(context.temp_allocator)
 		update_data()
+		oml.loader_update(doc.loader)
 		render(doc)
   }
+
+  oml.loader_shutdown(doc.loader)
 
   fmt.println("Deallocating before program exit")
   free_all(context.allocator)
@@ -77,5 +85,5 @@ main :: proc() {
 }
 
 nuke :: proc(doc: ^oml.Document) {
- 
+
 }

@@ -1,5 +1,6 @@
 package omlruntime
 
+import "base:intrinsics"
 
 import "core:c"
 import "base:runtime"
@@ -201,9 +202,6 @@ node_on_cfunc :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 // Converts a whole node (and its subtree) into a Lua table.
-//
-// `parent` is exposed as an opaque light-userdata handle rather than a table, so
-// building the tree can never recurse back into a cycle.
 push_node :: proc(L: ^lua.State, node: ^oml.Node, doc: ^oml.Document) {
   lua.newtable(L) // [t]
 
@@ -213,6 +211,11 @@ push_node :: proc(L: ^lua.State, node: ^oml.Node, doc: ^oml.Document) {
   lua.setfield(L, -2, "tag")
   lua_string(L, node.text)
   lua.setfield(L, -2, "text")
+
+  lua_string(L, node.source)
+  lua.setfield(L, -2, "source")
+  lua_string(L, node.data)
+  lua.setfield(L, -2, "data")
   lua_string(L, node_type_name(node.type))
   lua.setfield(L, -2, "type")
 
@@ -247,8 +250,6 @@ push_node :: proc(L: ^lua.State, node: ^oml.Node, doc: ^oml.Document) {
   lua.setfield(L, -2, "__node")
 
   // methods: element:on(event, fn)
-  // forward these values into the next function
-  // which would be :on
   lua.pushlightuserdata(L, node) // upvalue 1
   lua.pushlightuserdata(L, doc)  // upvalue 2
   lua.pushcclosure(L, node_on_cfunc, 2)

@@ -182,16 +182,19 @@ render_rect :: proc(render_command: ^clay.RenderCommand, bounds: clay.BoundingBo
 
 render_image :: proc(overlay_colors: ^[dynamic]clay.Color, render_command: ^clay.RenderCommand, bounds: clay.BoundingBox) {
   config := render_command.renderData.image
-	tint: clay.Color
+
+	tint: clay.Color = {255, 255, 255, 255}
 	if len(overlay_colors) > 0 {
 		tint = overlay_colors[len(overlay_colors) - 1]
 	}
-	if tint == 0 {
-		tint = {255, 255, 255, 255}
-	}
 
 	imageTexture := (^rl.Texture2D)(config.imageData)
-	rl.DrawTextureEx(imageTexture^, {bounds.x, bounds.y}, 0, bounds.width / f32(imageTexture.width), clay_to_rl(tint))
+	if imageTexture == nil || imageTexture.id == 0 do return
+
+	// stretch the texture to fill the element's box (like object-fit: fill)
+	src := rl.Rectangle{0, 0, f32(imageTexture.width), f32(imageTexture.height)}
+	dest := rl.Rectangle{bounds.x, bounds.y, bounds.width, bounds.height}
+	rl.DrawTexturePro(imageTexture^, src, dest, {0, 0}, 0, clay_to_rl(tint))
 }
 
 
@@ -215,6 +218,10 @@ clay_render :: proc(
         render_text(doc, render_command, bounds)
       case .Border:
    			render_border(render_command, bounds)
+      case .ScissorStart:
+        render_clip_start(render_command, bounds)
+      case .ScissorEnd:
+        render_clip_end(render_command, bounds)
   		case .OverlayColorStart:
   			config := render_command.renderData.overlayColor
   			append(&overlay_colors, config.color)
@@ -354,6 +361,12 @@ update_data :: proc() {
     rl.IsMouseButtonDown(rl.MouseButton.LEFT)
   )
   clay.SetLayoutDimensions({WindowWidth, WindowHeight})
+
+  // Feed this frame's wheel delta to clay so scroll containers update their
+  // stored scroll position. Must run before the layout is built. clay scales
+  // the delta internally (x10) and clamps to the scrollable content, so the
+  // raw raylib wheel value is passed straight through.
+  clay.UpdateScrollContainers(true, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
 }
 
 render :: proc(doc: ^oml.Document) {

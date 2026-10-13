@@ -79,10 +79,6 @@ event_kind_from_name :: proc(name: string) -> (Event_Kind, bool) {
   return .Hover, false
 }
 
-// TODO: Remake this MYSELF so i can still work on it.
-// TODO: Made with deepseek for getting a rough idea on HOW i could manage this
-// but not HOW i will do it
-
 // dispatches events every tick, this should later be implemented to happen only once when needed
 // 
 // if an event state has changed then we can emit it

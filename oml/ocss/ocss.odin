@@ -6,38 +6,23 @@ import "shared:clay"
 import "ast"
 import "parser"
 
-// A single selector a rule applies to (`.class`, `#id` or `element`).
 Selector :: struct {
   name: string,
   type: ast.Selector_Kind,
 }
 
-// One `name: value` pair exactly as written inside a rule block.
 Declaration :: struct {
   name:  string,
   value: string,
 }
 
-// A single rule of a stylesheet.
-//
-// Rules are allocated individually so that a pointer to one stays valid even
-// when the owning stylesheet collects more rules. The old code stored rules by
-// value in a dynamic array and pointed into it, so every append invalidated the
-// pointers held by the id/class maps.
 Style_Rule :: struct {
   selectors:    [dynamic]Selector,
   declarations: [dynamic]Declaration,
-  // The clay element config produced by applying `declarations` in order.
   properties:   clay.ElementDeclaration,
-  // The clay text config for this rule, used by text elements.
   text:         clay.TextElementConfig,
 }
 
-// A parsed ocss file: the ocss equivalent of the cssom.
-//
-// It lives on its own, independently of any oml document, and is only merged
-// into the dom afterwards. The lookup maps are indexes into the rule tree and
-// only ever point at heap allocated rules, so they are never invalidated.
 Style_Sheet :: struct {
   name:       string,
   path:       string,
@@ -47,18 +32,15 @@ Style_Sheet :: struct {
   elementMap: map[string]^Style_Rule,
 }
 
-// Accumulates declarations while styles are merged, then bakes them into a
-// single clay config. Sizing needs accumulation because e.g. `width`,
-// `min-width` and `max-width` may arrive from different rules and have to be
-// combined into one axis.
 Style_Builder :: struct {
   layout:     Layout,
   text:       Text,
   background: clay.Color,
-  image_url: string,
+  image_url:  string,
   border: Border,
-  // radius in pixels, converted to clays system using final bounds
   radius:     f32,
+  floating:   Floating,
+  clip:       clay.ClipElementConfig,
 }
 
 Border :: struct {
@@ -98,8 +80,22 @@ Sizing_Direction :: struct {
   has_value: bool,
 }
 
+//   - `align-self` / `float`
+//   - `float-attach-to` / `float-element` / `float-attach`: anchor by id
+Floating :: struct {
+  enabled:         bool,
+  attach_to:       clay.FloatingAttachToElement,
+  // id of the element to anchor to when `attach_to == .ElementWithId`
+  target:          string,
+  element_point:   clay.FloatingAttachPointType,
+  parent_point:    clay.FloatingAttachPointType,
+  offset:          clay.Vector2,
+  z_index:         i16,
+  clip_to:         clay.FloatingClipToElement,
+  pointer_capture: clay.PointerCaptureMode,
+}
+
 // Loads selectors from a selector list and adds them to the selector map
-//
 load_selectors :: proc(
 	rule: ^Style_Rule,
 	list: ^ast.Selector_List,
@@ -152,7 +148,6 @@ load_properties :: proc(rule: ^Style_Rule, props: ^ast.Block, allocator := conte
   rule.text = finalize_text(builder)
 }
 
-// Maps one ocss declaration onto the accumulating style builder.
 apply_declaration :: proc(style: ^Style_Builder, declaration: Declaration) {
   switch declaration.name {
   case "background-color":
@@ -184,6 +179,38 @@ apply_declaration :: proc(style: ^Style_Builder, declaration: Declaration) {
     if value, ok := parse_length(declaration.value); ok do style.layout.width.max = value
   case "max-height":
     if value, ok := parse_length(declaration.value); ok do style.layout.height.max = value
+  // floating / anchoring
+  case "align-self", "float":
+    apply_align_self(&style.floating, declaration.value)
+  case "float-attach-to":
+    apply_float_attach_to(&style.floating, declaration.value)
+  case "float-element":
+    style.floating.target = strings.trim_space(declaration.value)
+    style.floating.attach_to = .ElementWithId
+    style.floating.enabled = true
+  case "float-attach":
+    apply_float_attach(&style.floating, declaration.value)
+  case "float-offset":
+    apply_float_offset(&style.floating, declaration.value)
+  case "float-z":
+    if z, ok := parse_int(declaration.value); ok do style.floating.z_index = i16(z)
+  case "float-clip":
+    switch strings.trim_space(declaration.value) {
+    case "parent": style.floating.clip_to = .AttachedParent
+    case "none":   style.floating.clip_to = .None
+    }
+  case "float-pointer":
+    switch strings.trim_space(declaration.value) {
+    case "capture":     style.floating.pointer_capture = .Capture
+    case "passthrough": style.floating.pointer_capture = .Passthrough
+    }
+  // clipping / scroll containers
+  case "overflow", "clip":
+    apply_overflow(&style.clip, declaration.value)
+  case "overflow-x":
+    if on, ok := parse_overflow(declaration.value); ok do style.clip.horizontal = on
+  case "overflow-y":
+    if on, ok := parse_overflow(declaration.value); ok do style.clip.vertical = on
   case "border-color":
     if color, ok := parse_color(declaration.value); ok {
       style.border.color = color
@@ -202,7 +229,6 @@ apply_declaration :: proc(style: ^Style_Builder, declaration: Declaration) {
       style.text.has_font_size = true
     }
   case "font-id":
-    // explicit override; skips weight/size resolution
     if id, ok := parse_int(declaration.value); ok {
       style.text.font_id = u16(id)
       style.text.has_font_id = true
@@ -214,7 +240,7 @@ apply_declaration :: proc(style: ^Style_Builder, declaration: Declaration) {
   case "line-height":
     if value, ok := parse_int(declaration.value); ok do style.text.line_height = u16(value)
   case "image-url":
-    
+
   }
 }
 
@@ -227,21 +253,16 @@ apply_size :: proc(axis: ^Sizing_Direction, value: string) {
   axis.has_value = true
 }
 
-// Defaults for text elements that are styled but set no text property.
 DEFAULT_TEXT_COLOR :: clay.Color{40, 40, 40, 255}
 DEFAULT_TEXT_SIZE  :: u16(16)
 DEFAULT_TEXT_FONT  :: u16(0)
 
-// Lets ocss ask the engine to turn a requested font weight + size into a
-// concrete font id. ocss does not know which fonts are loaded, so the engine
-// (which owns them) supplies the lookup. `size == 0` means "any size".
 Font_Resolver :: struct {
   resolve:   proc(user_data: rawptr, weight: string, size: u16) -> u16,
   user_data: rawptr,
 }
 
-// Bakes the accumulated text properties into a clay text config, filling in
-// defaults for anything the stylesheets did not set.
+
 finalize_text :: proc(style: Style_Builder, resolver: Font_Resolver = {}) -> clay.TextElementConfig {
   config := clay.TextElementConfig{
     textColor = DEFAULT_TEXT_COLOR,
@@ -251,7 +272,6 @@ finalize_text :: proc(style: Style_Builder, resolver: Font_Resolver = {}) -> cla
   if style.text.has_color   do config.textColor = style.text.color
   if style.text.has_font_size do config.fontSize = style.text.font_size
 
-  // an explicit font-id wins; otherwise resolve the requested weight + size
   if style.text.has_font_id {
     config.fontId = style.text.font_id
   } else if resolver.resolve != nil {
@@ -264,11 +284,6 @@ finalize_text :: proc(style: Style_Builder, resolver: Font_Resolver = {}) -> cla
   return config
 }
 
-// Bakes an accumulated builder into a clay element config.
-//
-// `default_grow`, when true, makes an axis that was left entirely unset fill
-// its parent instead of shrink-wrapping. Used for the body, which should span
-// the window unless the stylesheets size it explicitly.
 finalize :: proc(style: Style_Builder, default_grow := false) -> clay.ElementDeclaration {
   config: clay.ElementDeclaration
   config.layout.layoutDirection = style.layout.direction
@@ -280,8 +295,29 @@ finalize :: proc(style: Style_Builder, default_grow := false) -> clay.ElementDec
   config.backgroundColor = style.background
   config.border.color = style.border.color
   config.border.width = style.border.width
-  // pixels; the renderer converts to roundness once the bounds are known
   config.cornerRadius = clay.CornerRadiusAll(style.radius)
+  if style.floating.enabled {
+    floating: clay.FloatingElementConfig
+    floating.attachTo = style.floating.attach_to
+    floating.attachment = {
+      element = style.floating.element_point,
+      parent  = style.floating.parent_point,
+    }
+    floating.offset = style.floating.offset
+    floating.zIndex = style.floating.z_index
+    floating.clipTo = style.floating.clip_to
+    floating.pointerCaptureMode = style.floating.pointer_capture
+    // anchoring to another element: clay matches the parent id hash, so it has
+    // to line up with the id the target node is opened with.
+    if style.floating.attach_to == .ElementWithId && len(style.floating.target) > 0 {
+      floating.parentId = clay.ID(style.floating.target).id
+    }
+    config.floating = floating
+  }
+
+  //clip contents outside of view
+  config.clip.horizontal = style.clip.horizontal
+  config.clip.vertical = style.clip.vertical
   return config
 }
 
@@ -393,7 +429,122 @@ apply_padding :: proc(layout: ^Layout, value: string) {
 }
 
 
-// === Value parsing ===
+apply_align_self :: proc(floating: ^Floating, value: string) {
+  switch strings.trim_space(value) {
+  case "left":
+    floating.enabled = true
+    floating.attach_to = .Parent
+    floating.element_point = .LeftCenter
+    floating.parent_point = .LeftCenter
+  case "right":
+    floating.enabled = true
+    floating.attach_to = .Parent
+    floating.element_point = .RightCenter
+    floating.parent_point = .RightCenter
+  case "center":
+    floating.enabled = true
+    floating.attach_to = .Parent
+    floating.element_point = .CenterCenter
+    floating.parent_point = .CenterCenter
+  case "top":
+    floating.enabled = true
+    floating.attach_to = .Parent
+    floating.element_point = .CenterTop
+    floating.parent_point = .CenterTop
+  case "bottom":
+    floating.enabled = true
+    floating.attach_to = .Parent
+    floating.element_point = .CenterBottom
+    floating.parent_point = .CenterBottom
+  case "none":
+    floating.enabled = false
+  }
+}
+
+apply_float_attach_to :: proc(floating: ^Floating, value: string) {
+  trimmed := strings.trim_space(value)
+  switch trimmed {
+  case "parent":
+    floating.attach_to = .Parent
+    floating.enabled = true
+  case "root":
+    floating.attach_to = .Root
+    floating.enabled = true
+  case "element", "id":
+    floating.attach_to = .ElementWithId
+    floating.enabled = true
+  case "none":
+    floating.enabled = false
+  case:
+    floating.attach_to = .ElementWithId
+    floating.target = trimmed
+    floating.enabled = true
+  }
+}
+
+apply_float_attach :: proc(floating: ^Floating, value: string) {
+  parts := strings.fields(value, context.temp_allocator)
+  if len(parts) == 0 do return
+  if point, ok := parse_attach_point(parts[0]); ok {
+    floating.element_point = point
+    floating.enabled = true
+  }
+  if len(parts) >= 2 {
+    if point, ok := parse_attach_point(parts[1]); ok {
+      floating.parent_point = point
+    }
+  }
+}
+
+// `float-offset: <x> [y]`; a single value applies to both axes.
+apply_float_offset :: proc(floating: ^Floating, value: string) {
+  parts := strings.fields(value, context.temp_allocator)
+  if len(parts) == 0 do return
+  if x, ok := parse_float(parts[0]); ok do floating.offset[0] = x
+  if len(parts) >= 2 {
+    if y, ok := parse_float(parts[1]); ok do floating.offset[1] = y
+  } else {
+    floating.offset[1] = floating.offset[0]
+  }
+}
+
+parse_attach_point :: proc(value: string) -> (point: clay.FloatingAttachPointType, ok: bool) {
+  switch strings.trim_space(value) {
+  case "left-top":       return .LeftTop, true
+  case "left-center":    return .LeftCenter, true
+  case "left-bottom":    return .LeftBottom, true
+  case "center-top":     return .CenterTop, true
+  case "center-center":  return .CenterCenter, true
+  case "center-bottom":  return .CenterBottom, true
+  case "right-top":      return .RightTop, true
+  case "right-center":   return .RightCenter, true
+  case "right-bottom":   return .RightBottom, true
+  }
+  return .LeftTop, false
+}
+
+// `overflow: <x> [y]` / `clip: hidden`
+apply_overflow :: proc(clip: ^clay.ClipElementConfig, value: string) {
+  parts := strings.fields(value, context.temp_allocator)
+  if len(parts) == 0 do return
+  if x, ok := parse_overflow(parts[0]); ok {
+    clip.horizontal = x
+    clip.vertical = x
+  }
+  if len(parts) >= 2 {
+    if y, ok := parse_overflow(parts[1]); ok do clip.vertical = y
+  }
+}
+
+//`clip`/`scroll`/`hidden` - clip,
+//`visible`/`none` - no clip.
+parse_overflow :: proc(value: string) -> (clip: bool, ok: bool) {
+  switch strings.trim_space(value) {
+  case "hidden", "clip", "scroll", "auto": return true, true
+  case "visible", "none": return false, true
+  }
+  return false, false
+}
 
 parse_int :: proc(value: string) -> (int, bool) {
   result, ok := strconv.parse_int(strings.trim_space(value))
@@ -405,15 +556,12 @@ parse_float :: proc(value: string) -> (f32, bool) {
   return result, ok
 }
 
-// Parses a pixel length, accepting an optional `px` suffix.
 parse_length :: proc(value: string) -> (f32, bool) {
   text := strings.trim_space(value)
   if strings.has_suffix(text, "px") do text = text[:len(text) - 2]
   return parse_float(text)
 }
 
-// `fit` and `grow` are keywords, `N%` is a percentage and everything else is a
-// pixel size. `type` is only meaningful when `ok` is true.
 parse_size :: proc(value: string) -> (type: clay.SizingType, amount: f32, ok: bool) {
   text := strings.trim_space(value)
   switch text {
@@ -559,12 +707,13 @@ merge_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, 
 }
 
 // computes the nodes merged style and returns it to merge it with the node
-resolve_style :: proc(sheets: []^Style_Sheet, tag, id: string, classes: []string, allocator := context.allocator, default_grow := false, resolver: Font_Resolver = {}) -> ^Style_Rule {
+resolve_style :: proc(sheets: []^Style_Sheet, data: ^string, tag, id: string, classes: []string, allocator := context.allocator, default_grow := false, resolver: Font_Resolver = {}) -> ^Style_Rule {
   merged, text, matched := merge_style(sheets, tag, id, classes, default_grow, resolver)
   if !matched do return nil
 
   rule := new(Style_Rule, allocator)
   rule.properties = merged
   rule.text = text
+  rule.properties.image.imageData = data
   return rule
 }

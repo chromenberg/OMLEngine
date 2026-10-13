@@ -10,12 +10,43 @@ build_element :: proc(doc: ^Document, node: ^Node) {
 				node.text,
 				node.styles != nil ? node.styles.text : DEFAULT_TEXT_CONFIG
 			)
+		case ImageNode:
+			config: clay.ElementDeclaration
+			if node.styles != nil {
+				config = node.styles.properties
+			}
+
+			if node.image.state == .Ready { // load image when ready
+				config.image.imageData = rawptr(&node.image.texture)
+			}
+			
+			elem_id := clay.ID(node.id)
+			if len(node.id) != 0 {
+				if clay.UI(elem_id)(config) {
+					dispatch_events(node)
+					clay.GetScrollContainerData(elem_id)
+
+					render_traverse(doc, node)
+				}
+			} else {
+				if clay.UI()(config) {
+					dispatch_events(node)
+					render_traverse(doc, node)
+				}
+			}
 		case RectNode:
 			if len(node.id) != 0 {
 
-				if clay.UI(clay.ID(node.id))(
-				  node.styles != nil ? node.styles.properties : {}
-				) {
+				if node.image.state == .Ready {
+				  node.styles.properties.image.imageData = rawptr(&node.image.texture)
+				}
+				config := node.styles != nil ? node.styles.properties : {}
+
+				open := clay.UI(clay.ID(node.id))
+				if config.clip.horizontal || config.clip.vertical {
+					config.clip.childOffset = clay.GetScrollOffset()
+				}
+				if open(config) {
     		  // dispatch then render
 					dispatch_events(node)
 					render_traverse(doc, node)
@@ -23,9 +54,12 @@ build_element :: proc(doc: ^Document, node: ^Node) {
 
 			} else {
 
-				if clay.UI()(
-				  node.styles != nil ? node.styles.properties : {}
-				) {
+				config := node.styles != nil ? node.styles.properties : {}
+				open := clay.UI()
+				if config.clip.horizontal || config.clip.vertical {
+					config.clip.childOffset = clay.GetScrollOffset()
+				}
+				if open(config) {
 					dispatch_events(node)
 					render_traverse(doc, node)
 				}
@@ -53,7 +87,6 @@ render_body :: proc(doc: ^Document) {
 	if body.styles != nil {
 		config = body.styles.properties
 	} else {
-		// no rule matched the body: still fill the window
 		config.layout.sizing = {clay.SizingGrow(), clay.SizingGrow()}
 	}
 

@@ -271,8 +271,6 @@ update_tree :: proc(xml_doc: ^xml.Document, doc: ^Document, current: ^Node, id: 
 
   element := get_xml_node(xml_doc, id)
 
-  // The xml document is freed once the dom is built, so copy the id/class
-  // attributes into the document arena.
   _, node_id := get_attribute_by_key(element, "id")
   if node_id != nil {
     new_node.id = strings.clone(node_id.(string), doc.allocator)
@@ -281,6 +279,13 @@ update_tree :: proc(xml_doc: ^xml.Document, doc: ^Document, current: ^Node, id: 
   _, node_class := get_attribute_by_key(element, "class")
   if node_class != nil {
     new_node.classes = split_classes(node_class.(string), doc.allocator)
+  }
+
+  _, node_src := get_attribute_by_key(element, "src")
+  if node_src != nil {
+    new_node.source = strings.clone(node_src.(string), doc.allocator)
+
+    loader_request(doc.loader, new_node, node_src.(string))
   }
 
   append(&current.children, new_node)
@@ -292,7 +297,6 @@ update_tree :: proc(xml_doc: ^xml.Document, doc: ^Document, current: ^Node, id: 
    	doc.body = new_node
   }
 
-  // recurse, shifting the current node to be the parent, and the child to be the current
   return new_node
 }
 
@@ -302,7 +306,7 @@ deserialize :: proc(xml_doc: ^xml.Document, doc: ^Document, current: ^Node, curr
   for child in node.value {
     switch v in child {
       case string:
-        // the text content of the current element (e.g. the body of <text>)
+
         content := strings.trim_space(v)
         if len(content) > 0 {
           current.text = strings.clone(content, doc.allocator)
@@ -330,17 +334,15 @@ load_fonts :: proc(doc: ^Document) {
     if font.fontSize == 0 do font.fontSize = FONT_SIZES[i]
     font.fontID = u16(i)
     load_font(doc, font)
-    
+
     log.infof("Loaded font source [%v] with size of %d", font.source, FONT_SIZES[i])
-    
+
   }
-  
+
   log.infof("Loaded fonts. Fonts loaded (%d sizes): %d", FONT_SIZE_COUNTS, len(doc.font_imports))
-  
+
 }
 
-// Parses every queued ocss source into its own stylesheet and collects them on
-// the document, in the order they were imported.
 load_styles :: proc(doc: ^Document) {
   for source in doc.style_imports {
     log.infof("Importing %v", source)
@@ -363,10 +365,9 @@ merge_styles :: proc(doc: ^Document) {
 
 merge_node :: proc(doc: ^Document, node: ^Node) {
   default_grow := node == doc.body // if the node is the body, then make it fill screen
-  // the engine owns the loaded fonts, so it resolves ocss font requests
   resolver := ocss.Font_Resolver{ resolve = resolve_font_id_cb, user_data = doc }
-  node.styles = ocss.resolve_style(doc.styles[:], node.tag, node.id, node.classes, doc.allocator, default_grow, resolver)
-  
+  node.styles = ocss.resolve_style(doc.styles[:], &node.data, node.tag, node.id, node.classes, doc.allocator, default_grow, resolver)
+
   for child in node.children {
     merge_node(doc, child)
   }
@@ -388,15 +389,12 @@ parse :: proc(filename: string, doc: ^Document) {
   doc.scripts = make([dynamic]^Loaded_Script, doc.allocator)
   doc.font_imports = make([dynamic]^RL_Font, doc.allocator)
   doc.fonts = make([dynamic]^RL_Font, doc.allocator)
-  // Allocate the document collections on the arena so they share its lifetime.
 
   assemble_document(xml_doc, doc)
-
-  // The dom is complete: parse the queued stylesheets, then merge them in.
   load_styles(doc)
+  load_fonts(doc)
   merge_styles(doc)
   load_scripts(doc)
-  load_fonts(doc)
 
   log.infof("Parsed %v", filename)
 }

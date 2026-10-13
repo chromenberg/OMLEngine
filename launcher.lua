@@ -27,9 +27,13 @@ local function reset_sidebar_items()
   end
 end
 
+elems[1]["active"] = true
+set_color(elems[1], active)
+
 for _, node in pairs(elems) do
   -- Assigning a value to an OML DOM node
-  node["active"] = false 
+  node["active"] = false
+
 
   -- Listening to an event from an OML node
   node:on("mouse:hover.enter", function()
@@ -63,16 +67,17 @@ end
 local gameCards = get_elements_by_class("gameContainer") 
 
 for _, game in pairs(gameCards) do
-  -- listens for when the mouse goes over this node
-  game:on("mouse:hover.enter", function()
-    cursor_pointer()
-    -- Child node modification
-    set_color(game.children[1], friends1)
-  end)
+    -- listens for when the mouse goes over this node
+    game:on("mouse:hover.enter", function()
+        cursor_pointer()
+        -- Child node modification
+        set_color(game.children[1], friends1)
+    end)
 
-  -- listens for when the mouse leaves this node
-  game:on("mouse:hover.leave", function()
-    cursor_default() -- set cursor appearance to default
-    set_color(game.children[1], friends)
-  end)
+    -- listens for when the mouse leaves this node
+    game:on("mouse:hover.leave", function()
+        cursor_default() -- set cursor appearance to default
+        set_color(game.children[1], friends)
+    end)
 end
+

@@ -20,6 +20,17 @@ NodeType :: enum {
   InputBox,
   Input
 }
+Any_Node :: union {
+  ^Node,
+  ^RootNode,
+  ^TextNode,
+  ^LinkNode,
+  ^RectNode,
+  ^ImageNode,
+  ^InputNode,
+  ^InputBoxNode,
+  ^ButtonNode,
+}
 
 ColorType :: enum {
   RGB,
@@ -114,7 +125,13 @@ Events :: struct {
   onHover: Event_Proc
 }
 
+Image_Data :: struct {
+  source: string,
+  data: rawptr
+}
+
 INode :: struct {
+  derived: Any_Node,
   // The type of the node according to the node enum
   type: NodeType,
   // the typeid of the node that inherits this node
@@ -131,13 +148,16 @@ INode :: struct {
   // the text content of an element (e.g. the body of <text>)
   text: string,
 
+  // src attribute of the element
+  source: string,
+  data: string
 }
 
 // Holds fields relating to what the garbage collector will track,
-// 
+//
 // if an element has 0 references for long enough then the node will be removed
 // assuming the node has no parents or children
-// 
+//
 // This is mostly not needed right now, as this would be a language-side thing
 GC_Data :: struct {
 	refs: int
@@ -146,7 +166,7 @@ GC_Data :: struct {
 Interactable :: struct {
 	event_list: ^Event,
 	hovered: bool,
-} 
+}
 
 Node :: struct {
   using base: INode,
@@ -154,6 +174,7 @@ Node :: struct {
   using gc: GC_Data,
   parent: ^Node,
   children: [dynamic]^Node,
+  image: Node_Image,
   tmp_visited: bool `false`
 }
 
@@ -176,7 +197,6 @@ ImageNode :: struct {
   using node: Node,
   data: ^[]byte,
   source: string,
-  cache_source: string
 }
 StyleClass :: NodeStyle
 // A style id is still referenced by a name and style data, so we can go off the class data
@@ -208,7 +228,7 @@ Document :: struct {
   body : ^Node,
   head : ^Node,
 
- 
+  loader: ^Loader
 }
 
 Loaded_Script :: struct {
@@ -222,4 +242,18 @@ RL_Font :: struct {
   weight: string,
   source: string,
   font: raylib.Font
+}
+
+// Image lifecycle state, ready = able to be sent back to the DOM
+Image_State :: enum {
+  None,
+  Loading,
+  Ready,
+  Failed,
+}
+
+Node_Image :: struct {
+  url:     string,
+  state:   Image_State,
+  texture: raylib.Texture2D,
 }
