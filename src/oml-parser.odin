@@ -11,6 +11,7 @@ OML_Parser :: struct {
 	doc: ^Document,
 	index: int,
 	current_node: xml.Element,
+	style_queue: [dynamic]string
 }
 
 Any_Node :: union {
@@ -22,6 +23,7 @@ Any_Node :: union {
   ^InputElement,
   ^ButtonElement,
   ^ImageElement,
+  ^LinkElement,
   ^Node_With_Children,
   ^Node
 }
@@ -44,10 +46,16 @@ TextElement :: struct {
 
 ImageElement :: struct {
   using elem: Node,
+  source: string,
 }
 
 ButtonElement :: struct {
   using elem: Element,
+}
+LinkElement :: struct {
+  using elem: Element,
+  source: string,
+  type: string
 }
 
 InputElement :: struct {
@@ -311,6 +319,10 @@ create_node :: proc(p: ^OML_Parser, elem: xml.Element) -> ^Node {
     n.derived = n
     n.children = make([dynamic]^Node, p.allocator)
     return &n.elem.node.base
+  case "link":
+    n := new(LinkElement, p.allocator)
+    n.derived = n
+    return &n.elem.base
   case "img":
     n := new(ImageElement, p.allocator)
     n.derived = n
@@ -323,9 +335,8 @@ create_node :: proc(p: ^OML_Parser, elem: xml.Element) -> ^Node {
   }
 }
 
-// Returns the child list of a node when its concrete type can hold children.
 node_children :: proc(node: ^Node) -> (children: ^[dynamic]^Node, ok: bool) {
-  switch derived in node.derived {
+  #partial switch derived in node.derived {
   case ^DocumentElement:
     return &derived.e.node.children, true
   case ^DivElement:
@@ -356,6 +367,22 @@ set_node_attributes :: proc(p: ^OML_Parser, node: ^Node, elem: xml.Element) {
   if class, ok := get_attribute(elem, "class"); ok {
     node.class = split_classes(class, p.allocator)
   }
+
+  if source, ok := get_attribute(elem, "source"); ok {
+    #partial switch v in node.derived {
+    case ^ImageElement:
+      v.source = strings.clone(source, p.allocator)
+    case ^LinkElement:
+      v.source = strings.clone(source, p.allocator)
+      if t, has_type := get_attribute(elem, "type"); has_type {
+        v.type = strings.clone(t, p.allocator)
+      }
+
+      if v.type == "style" {
+        append(&p.style_queue, v.source)
+      }
+    }
+  }
 }
 
 // Runs for every node that is created
@@ -384,6 +411,7 @@ parse_node :: proc(p: ^OML_Parser, id: xml.Element_ID, parent: ^Node, hook: Node
           node.text = strings.clone(content, p.allocator)
         }
       case xml.Element_ID:
+
         append(children, parse_node(p, child, node, hook))
       }
     }
@@ -391,6 +419,7 @@ parse_node :: proc(p: ^OML_Parser, id: xml.Element_ID, parent: ^Node, hook: Node
 
   return node
 }
+
 
 parse_oml :: proc(p: ^OML_Parser, hook: Node_Hook = nil) {
 	if p.doc == nil {
@@ -408,6 +437,20 @@ parse_oml :: proc(p: ^OML_Parser, hook: Node_Hook = nil) {
 
 	p.doc.tree = parse_node(p, 0, nil, hook)
 	xml.destroy(p.xdoc, p.allocator)
+
+	for file in p.style_queue {
+    c := new(CSS_Parser, p.allocator)
+    c.doc = p.doc
+    c.allocator = p.allocator
+    c.arena = p.arena
+    c.file.src = file
+
+	  parse_css(c)
+    append(&c.doc.loaded_styles, c.sheet)
+    free(c)
+	}
+	
 	p.xdoc = nil
 	log.infof("tree %#v", p.doc.tree.derived)
+	log.infof("styles %#v", p.doc.loaded_styles[:])
 }

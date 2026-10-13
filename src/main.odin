@@ -7,6 +7,7 @@ import "core:nbio"
 
 // Represents the entire page, everything to do with DOM creation, OCSSOM creation and bindings are held here
 Document :: struct {
+  // Alligator
 	allocator: mem.Allocator,
 
 	// document arena, used for temporary allocations like parsing before cloning finalized data out into the main allocator to last for the lifetime of the process
@@ -21,7 +22,7 @@ Document :: struct {
 	// root of the dom parsed out of the oml file
 	tree: ^Node,
 	// loaded_scripts: nil,
-	// loaded_styles: nil
+	loaded_styles: [dynamic]^CSS_Stylesheet
 }
 
 File :: struct {
