@@ -5,19 +5,21 @@ import "core:log"
 import "core:mem"
 import "core:nbio"
 
-// Represents the entire page, everything to do with DOM creation, OCSSOM creation and bindings are held here 
+// Represents the entire page, everything to do with DOM creation, OCSSOM creation and bindings are held here
 Document :: struct {
 	allocator: mem.Allocator,
 
 	// document arena, used for temporary allocations like parsing before cloning finalized data out into the main allocator to last for the lifetime of the process
 	arena: mem.Allocator,
-	
+
 	// inner data of the docs arena allocator
 	_arena: ^mem.Dynamic_Arena,
 	// store the event loop in the doc?
 	event_loop: nbio.Event_Loop,
-	
+
 	file: File,
+	// root of the dom parsed out of the oml file
+	tree: ^Node,
 	// loaded_scripts: nil,
 	// loaded_styles: nil
 }
@@ -25,7 +27,7 @@ Document :: struct {
 File :: struct {
 	name: string,
 	src: string,
-	
+
 	errors: int,
 	warns: int,
 }

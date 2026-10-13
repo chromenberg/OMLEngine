@@ -32,9 +32,8 @@ set_color(elems[1], active)
 
 for _, node in pairs(elems) do
   -- Assigning a value to an OML DOM node
-  node["active"] = false
-
-
+    node["active"] = false
+  
   -- Listening to an event from an OML node
   node:on("mouse:hover.enter", function()
     -- uses the current node and checks if the value "active" that was assigned to it is false
