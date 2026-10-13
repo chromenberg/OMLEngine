@@ -42,16 +42,10 @@ main :: proc() {
 	oml_parse.doc = &doc
 	oml_parse.file = doc.file
 
-	log.logf(.Info, "Before scheduling")
-	{
-		context.user_ptr = &oml_parse
-		oml.timeout(1000000000, &oml_parse, proc(op: ^oml.Event_Op, p: ^oml.OML_Parser) {
-			// nbio.detach(op)
-			log.logf(.Info, "Scheduled function was ran")
-			oml.parse_oml(p)
-		})
-	}
-	log.logf(.Info, "After scheduling")
+
+	oml.schedule(&oml_parse, proc(op: ^oml.Event_Op, p: ^oml.OML_Parser) {
+		oml.parse_oml(p)
+	})
 
 	oml.wake_loop()
 }
