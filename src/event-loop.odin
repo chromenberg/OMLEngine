@@ -78,7 +78,7 @@ timeout_3args :: proc(duration: time.Duration, arg1: $T, arg2: $T2, arg3: $T3, c
 }
 
 // Schedules a task to occur in `duration`ns
-schedule :: proc {
+timeout :: proc {
 	timeout_noargs,
 	timeout_1arg,
 	timeout_2args,
@@ -93,6 +93,31 @@ write :: proc {
 	nbio.write_poly3,
 }
 
-exec :: nbio.exec
-
 pending_events :: nbio.num_waiting
+
+schedule_cb :: proc(cb: proc(op: ^nbio.Operation)) {
+	nbio.exec(nbio.Operation{
+		cb = cb
+	})
+}
+
+schedule_with_1ptr :: proc(data: rawptr, cb: proc(op: ^nbio.Operation)) {
+	nbio.exec(nbio.Operation{
+		cb = cb,
+		user_data = {data}
+	})
+}
+
+schedule_with_varptr :: proc(cb: proc(op: ^nbio.Operation), data: ..rawptr) {
+	nbio.exec(nbio.Operation{
+		cb = cb,
+		user_data = data
+	})
+}
+
+schedule :: proc {
+	nbio.exec,
+	schedule_cb,
+	schedule_with_1ptr,
+	schedule_with_varptr
+}
