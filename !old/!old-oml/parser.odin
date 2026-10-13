@@ -285,7 +285,7 @@ update_tree :: proc(xml_doc: ^xml.Document, doc: ^Document, current: ^Node, id: 
   if node_src != nil {
     new_node.source = strings.clone(node_src.(string), doc.allocator)
 
-    loader_request(doc.loader, new_node, node_src.(string))
+    // loader_request(doc.loader, new_node, node_src.(string))
   }
 
   append(&current.children, new_node)

@@ -1,9 +1,0 @@
-<odin>
-  <head>
-    <link type="style" source="tests/cascade.ocss" />
-  </head>
-  <body>
-    <rect id="target" class="box" />
-    <rect id="plain" />
-  </body>
-</odin>

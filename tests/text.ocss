@@ -1,6 +1,0 @@
-rule (text) {
-	color: #ff0000;
-	font-size: 24;
-	font-id: 3;
-	letter-spacing: 1;
-}

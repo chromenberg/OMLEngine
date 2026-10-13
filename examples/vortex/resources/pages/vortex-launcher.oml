@@ -1,17 +1,16 @@
 <odin>
   <head>
     <link type="style" source="vortex.ocss" />
-    <link type="style" source="vortex-games.ocss" />
+    <!-- <link type="style" source="vortex-games.ocss" />
     <link type="font" weight="bold" source="./resources/Figtree-Bold.ttf"/>
     <link type="font" weight="semibold" source="./resources/Figtree-Medium.ttf"/>
     <link type="font" weight="regular" source="./resources/Figtree-Regular.ttf"/>
-    <script source="launcher.lua" />
+    <script source="launcher.lua" /> -->
   </head>
   <body>
     <rect id="root">
       <rect class="launcherContainer">
         <rect class="appHeader">
-          <img src="https://playvortex.io/logo.png" id="image"/>
           <rect class="headerInner">
             <rect id="search-box">
               <text class="mutedTextThin">Search players...</text>
@@ -300,7 +299,6 @@
                   </rect>
                 </rect>
               </rect>
-            
             </rect>
           </rect>
         </rect>

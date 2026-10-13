@@ -191,12 +191,12 @@ LinkNodeType :: enum {
 LinkNode :: struct {
   using node: Node,
   link_type: LinkNodeType,
-  source: string
+  // source: string
 }
 ImageNode :: struct {
   using node: Node,
-  data: ^[]byte,
-  source: string,
+  // data: ^[]byte,
+  // source: string,
 }
 StyleClass :: NodeStyle
 // A style id is still referenced by a name and style data, so we can go off the class data
@@ -228,7 +228,7 @@ Document :: struct {
   body : ^Node,
   head : ^Node,
 
-  loader: ^Loader
+  // loader: ^Loader
 }
 
 Loaded_Script :: struct {
