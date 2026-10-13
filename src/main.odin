@@ -18,8 +18,8 @@ Document :: struct {
 	event_loop: nbio.Event_Loop,
 	
 	file: File,
-	loaded_scripts: nil,
-	loaded_styles: nil
+	// loaded_scripts: nil,
+	// loaded_styles: nil
 }
 
 File :: struct {
@@ -33,6 +33,7 @@ File :: struct {
 Parser :: struct {
 	// this is redirected to `Document.allocator`
 	allocator: mem.Allocator,
+	arena: mem.Allocator,
 	file: File,
 	source: string,
 }

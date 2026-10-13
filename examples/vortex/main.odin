@@ -1,5 +1,7 @@
 package main
 
+import "core:time"
+import "core:nbio"
 import "core:log"
 import "core:mem"
 import "core:fmt"
@@ -27,12 +29,29 @@ main :: proc() {
 
 	doc: oml.Document
 	doc.file.src = "examples/vortex/resources/pages/vortex-launcher.oml"
-	
+
 	oml.start_event_loop()
 	defer oml.close_event_loop()
 
 	oml.init(&doc)
 	defer oml.clean_doc(&doc)
 
-	oml.schedule()
+	oml_parse : oml.OML_Parser
+	oml_parse.allocator = doc.allocator
+	oml_parse.arena = doc.arena
+	oml_parse.doc = &doc
+	oml_parse.file = doc.file
+
+	log.logf(.Info, "Before scheduling")
+	{
+		context.user_ptr = &oml_parse
+		oml.timeout(1000000000, &oml_parse, proc(op: ^oml.Event_Op, p: ^oml.OML_Parser) {
+			// nbio.detach(op)
+			log.logf(.Info, "Scheduled function was ran")
+			oml.parse_oml(p)
+		})
+	}
+	log.logf(.Info, "After scheduling")
+
+	oml.wake_loop()
 }

@@ -6,17 +6,17 @@ import "core:log"
 
 // Defines a task that is ran on the event loop
 Task :: struct {
-	
+
 }
 
 start_event_loop :: proc(/* doc: ^Document */) {
-	log.logf(.Info, "Acquiring OMLEngine event loop")	
+	log.logf(.Info, "Acquiring OMLEngine event loop")
 	if err := nbio.acquire_thread_event_loop(); err != nil {
 		log.errorf("OMLEngine failed to acquire the event loop. nbio err: %v", nbio.error_string(err))
 		return
 	}
 	log.logf(.Info, "Acquired OMLEngine event loop")
-	
+
 }
 
 close_event_loop :: proc() {
@@ -25,35 +25,39 @@ close_event_loop :: proc() {
 }
 
 // Schedules a task to occur on the next tick of the event loop
-// 
+//
 // This procedure has no arguments
+@(private="file")
 next_tick_noargs :: proc(cb: nbio.Callback) -> ^nbio.Operation {
 	return nbio.next_tick(cb)
 }
 
 
 // Schedules a task to occur on the next tick of the event loop
-// 
+//
 // This procedure has 1 arguments
+@(private="file")
 next_tick_1arg :: proc(arg1: $T, cb: $C/proc(op: ^nbio.Operation, arg1: T)) -> ^nbio.Operation {
 	return nbio.next_tick_poly(arg1,cb)
 }
 
 // Schedules a task to occur on the next tick of the event loop
-// 
+//
 // This procedure has 2 arguments
+@(private="file")
 next_tick_2args :: proc(arg1: $T, arg2: $T2, cb: $C/proc(op: ^nbio.Operation, arg1: T, arg2: T2)) -> ^nbio.Operation {
 	return nbio.next_tick_poly2(arg1, arg2, cb)
 }
 
 // Schedules a task to occur on the next tick of the event loop
-// 
+//
 // This procedure has no arguments
+@(private="file")
 next_tick_3args :: proc(arg1: $T, arg2: $T2, arg3: $T3, cb: $C/proc(op: ^nbio.Operation, arg1: T, arg2: T2, arg3: T3)) -> ^nbio.Operation {
 	return nbio.next_tick_poly3(arg1, arg2, arg2, cb)
 }
 
-next_tick :: proc {
+schedule :: proc {
 	next_tick_noargs,
 	next_tick_1arg,
 	next_tick_2args,
@@ -61,18 +65,22 @@ next_tick :: proc {
 }
 
 
+@(private="file")
 timeout_noargs :: proc(duration: time.Duration, cb: nbio.Callback) -> ^nbio.Operation {
 	return nbio.timeout(duration, cb)
 }
 
+@(private="file")
 timeout_1arg :: proc(duration: time.Duration, arg1: $T, cb: $C/proc(op: ^nbio.Operation, arg1: T)) -> ^nbio.Operation {
 	return nbio.timeout_poly(duration, arg1, cb)
 }
 
+@(private="file")
 timeout_2args :: proc(duration: time.Duration, arg1: $T, arg2: $T2, cb: $C/proc(op: ^nbio.Operation, arg1: T, arg2: T2)) -> ^nbio.Operation {
 	return nbio.timeout_poly2(duration, arg1, arg2, cb)
 }
 
+@(private="file")
 timeout_3args :: proc(duration: time.Duration, arg1: $T, arg2: $T2, arg3: $T3, cb: $C/proc(op: ^nbio.Operation, arg1: T, arg2: T2, arg3: T3)) -> ^nbio.Operation {
 	return nbio.timeout_poly3(duration, arg1, arg2, arg2, cb)
 }
@@ -95,29 +103,40 @@ write :: proc {
 
 pending_events :: nbio.num_waiting
 
+
+@(private="file")
+schedule_ :: proc(op: ^nbio.Operation) {
+	nbio.exec(op)
+}
+
+@(private="file")
 schedule_cb :: proc(cb: proc(op: ^nbio.Operation)) {
-	nbio.exec(nbio.Operation{
+	nbio.exec(&nbio.Operation{
 		cb = cb
 	})
 }
 
+@(private="file")
 schedule_with_1ptr :: proc(data: rawptr, cb: proc(op: ^nbio.Operation)) {
-	nbio.exec(nbio.Operation{
-		cb = cb,
-		user_data = {data}
-	})
-}
-
-schedule_with_varptr :: proc(cb: proc(op: ^nbio.Operation), data: ..rawptr) {
-	nbio.exec(nbio.Operation{
+	nbio.exec(&nbio.Operation{
 		cb = cb,
 		user_data = data
 	})
 }
 
-schedule :: proc {
-	nbio.exec,
-	schedule_cb,
-	schedule_with_1ptr,
-	schedule_with_varptr
+@(private="file")
+schedule_with_varptr :: proc(data: [5]rawptr, cb: proc(op: ^nbio.Operation)) {
+	nbio.exec(&nbio.Operation{
+		cb = cb,
+		user_data = data
+	})
 }
+
+wake_loop :: proc() -> nbio.General_Error {
+	return nbio.run()
+}
+
+read_file :: nbio.read_entire_file
+Read_Err :: nbio.Read_Entire_File_Error
+
+Event_Op :: nbio.Operation
