@@ -1,5 +1,6 @@
 package main
 
+import "vendor:sdl3"
 import "core:time"
 import "core:nbio"
 import "core:log"
@@ -11,9 +12,13 @@ import "../../src/renderer"
 schedule_draw :: proc(w: ^renderer.Renderer) {
 	oml.timeout(1000_000, w, proc(op: ^oml.Event_Op, w: ^renderer.Renderer) {
 		renderer.draw(w)
-		log.logf(.Info, "drawing")
-
 		schedule_draw(w)
+	})
+}
+
+schedule_reflow :: proc (r: ^renderer.Renderer) {
+	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
+		renderer.reflow(r)
 	})
 }
 
@@ -59,10 +64,21 @@ main :: proc() {
 		oml.find_styles(p.doc, p.doc.tree)
 	})
 
-	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
-		renderer.reflow(r)
-	})
+	schedule_reflow(r)
 
-	// schedule_draw(r)
-	oml.wake_loop()
+	mainloop: for {
+		for e: sdl3.Event; sdl3.PollEvent(&e); {
+			#partial switch e.type {
+			case .QUIT, .WINDOW_CLOSE_REQUESTED, .LOW_MEMORY:
+				log.log(.Debug, "Requested program close")
+				break mainloop
+			case .WINDOW_MOVED:
+				log.log(.Debug, "Window has been resized. Need to reflow layout.")
+				// schedule_reflow(r)
+			}
+		}
+
+		schedule_draw(r)
+		nbio.tick()
+	}
 }

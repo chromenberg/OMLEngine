@@ -12,7 +12,7 @@ Scale :: struct {
 
 Window_Data :: struct {
 	name: string `Erdene`,
-	flags: sdl3.WindowFlags `{.VULKAN}`,
+	flags: sdl3.WindowFlags `{.VULKAN, .RESIZABLE}`,
 }
 
 SDL_Data :: struct {
