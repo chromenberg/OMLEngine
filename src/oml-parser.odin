@@ -24,12 +24,11 @@ Any_Node :: union {
   ^ButtonElement,
   ^ImageElement,
   ^LinkElement,
-  ^Node_With_Children,
-  ^Node
+  ^Node,
 }
 
 Element :: struct {
-  using node: Node_With_Children,
+  using node: Node,
 }
 
 DocumentElement :: struct {
@@ -45,7 +44,7 @@ TextElement :: struct {
 }
 
 ImageElement :: struct {
-  using elem: Node,
+  using elem: Element,
   source: string,
 }
 
@@ -76,16 +75,18 @@ Dirty_Type :: enum {
 
 Dirty_Flags :: bit_set[Dirty_Type]
 
+Box :: struct {
+	x,y,w,h: f32,
+	content_x, content_y, content_w, content_h: f32
+}
+
 Render_Info :: struct {
   refs: int,
   // every element made is automatically dirtied to force the renderer to paint it
   // then this value is reset
-  dirty: Dirty_Flags
-}
-
-Node_With_Children :: struct {
-  using base: Node,
-  children: [dynamic]^Node
+  dirty: Dirty_Flags,
+  cur_box: Box,
+  old_box: Box
 }
 
 Node_Cached :: struct {
@@ -107,7 +108,7 @@ Sizing_Type :: enum {
 
 Sizing_Value :: struct {
   type: Sizing_Type,
-  val: int
+  val: f32
 }
 
 Style_Sizing :: struct {
@@ -189,20 +190,16 @@ Y_Align_Type :: enum {
   Bottom,
 }
 
-
-
-Style_Children :: struct {
-  align_items: Y_Align_Type,
-  align_self: Y_Align_Type,
-  justify_content: X_Align_Type,
-  justify_self: X_Align_Type,
-}
-
 Display_Type :: enum {
   Block,
   Flex,
   Grid,
   None,
+}
+
+Direction :: enum {
+  Horizontal,
+  Vertical
 }
 
 Style_Layout :: struct {
@@ -214,23 +211,35 @@ Style_Layout :: struct {
   margin_inline: Style_Inline_Sizes,
   margin_block: Style_Block_Sizes,
 
-  display: Display_Type
+  display: Display_Type,
+  direction: Direction,
+
+  align_items: Y_Align_Type,
+  align_self: Y_Align_Type,
+  justify_content: X_Align_Type,
+  justify_self: X_Align_Type,
+
+  gap: f32
 }
 
 Node_Style :: struct {
   sizing: Style_Sizing,
-  text: Style_Text
+  text: Style_Text,
+  layout: Style_Layout,
+  border: Style_Border,
+  clip: Style_Clipping,
 }
 
 Node :: struct {
-  using render: Render_Info,
-  derived: Any_Node,
-  parent: ^Node,
+  render: Render_Info, // info for rendering a node
+  derived: Any_Node, // type that is inheriting the node
+  parent: ^Node, // node parent
   id: string,
   class: [dynamic]string,
   text: string,
-  style: ^Node_Style,
-  applied_styles: map[string]^Node_Style
+  children: [dynamic]^Node,
+  style: ^Node_Style, // styles that are applied to the node, based off of style precedence
+  applied_styles: map[string]^Node_Style // styles that are currently affecting the node
 }
 
 open_file :: proc(p: ^OML_Parser) -> (err: xml.Error) {
@@ -241,7 +250,6 @@ open_file :: proc(p: ^OML_Parser) -> (err: xml.Error) {
 Node_Types :: enum {
   Document,
   Node,
-  Node_With_Children,
   Element,
   TextElement,
   DivElement,
@@ -256,7 +264,6 @@ Node_Types :: enum {
 Node_Type : [Node_Types.Count]typeid = {
   DocumentElement,
   Node,
-  Node_With_Children,
   Element,
   TextElement,
   DivElement,
@@ -293,45 +300,45 @@ create_node :: proc(p: ^OML_Parser, elem: xml.Element) -> ^Node {
     n := new(DocumentElement, p.allocator)
     n.derived = n
     n.children = make([dynamic]^Node, p.allocator)
-    return &n.e.node.base
+    return &n.e.node
   case "div", "rect":
     n := new(DivElement, p.allocator)
     n.derived = n
     n.children = make([dynamic]^Node, p.allocator)
-    return &n.elem.node.base
+    return &n.elem.node
   case "text", "p":
     n := new(TextElement, p.allocator)
     n.derived = n
     n.children = make([dynamic]^Node, p.allocator)
-    return &n.elem.node.base
+    return &n.elem.node
   case "button":
     n := new(ButtonElement, p.allocator)
     n.derived = n
     n.children = make([dynamic]^Node, p.allocator)
-    return &n.elem.node.base
+    return &n.elem.node
   case "input":
     n := new(InputElement, p.allocator)
     n.derived = n
     n.children = make([dynamic]^Node, p.allocator)
-    return &n.elem.node.base
+    return &n.elem.node
   case "canvas":
     n := new(CanvasElement, p.allocator)
     n.derived = n
     n.children = make([dynamic]^Node, p.allocator)
-    return &n.elem.node.base
+    return &n.elem.node
   case "link":
     n := new(LinkElement, p.allocator)
     n.derived = n
-    return &n.elem.base
+    return &n.elem.node
   case "img":
     n := new(ImageElement, p.allocator)
     n.derived = n
-    return &n.elem
+    return &n.elem.node
   case:
     n := new(Element, p.allocator)
     n.derived = n
     n.children = make([dynamic]^Node, p.allocator)
-    return &n.node.base
+    return &n.node
   }
 }
 
@@ -351,9 +358,9 @@ node_children :: proc(node: ^Node) -> (children: ^[dynamic]^Node, ok: bool) {
     return &derived.elem.node.children, true
   case ^Element:
     return &derived.node.children, true
-  case ^Node_With_Children:
+  case ^Node:
     return &derived.children, true
-  case ^ImageElement, ^Node:
+  case ^ImageElement:
     return nil, false
   }
   return nil, false
@@ -369,17 +376,17 @@ set_node_attributes :: proc(p: ^OML_Parser, node: ^Node, elem: xml.Element) {
   }
 
   if source, ok := get_attribute(elem, "source"); ok {
-    #partial switch v in node.derived {
+    #partial switch v in node.derived { // if theres a source attribute on the xml elem and node
     case ^ImageElement:
       v.source = strings.clone(source, p.allocator)
     case ^LinkElement:
-      v.source = strings.clone(source, p.allocator)
+      v.source = strings.clone(source, p.allocator) // set source to a new copy of the source so we can dealloc xml without it bitching
       if t, has_type := get_attribute(elem, "type"); has_type {
         v.type = strings.clone(t, p.allocator)
       }
 
-      if v.type == "style" {
-        append(&p.style_queue, v.source)
+      if v.type == "style" { // if the link is importing a stylesheet
+        append(&p.style_queue, v.source) // add to the import queue
       }
     }
   }
@@ -388,7 +395,7 @@ set_node_attributes :: proc(p: ^OML_Parser, node: ^Node, elem: xml.Element) {
 // Runs for every node that is created
 Node_Hook :: proc(p: ^OML_Parser, node: ^Node, elem: xml.Element)
 
-// DFS, starts with ID and keeps running
+// DFS parsing
 parse_node :: proc(p: ^OML_Parser, id: xml.Element_ID, parent: ^Node, hook: Node_Hook) -> ^Node {
   p.index = int(id)
   elem := p.xdoc.elements[id]
@@ -396,10 +403,17 @@ parse_node :: proc(p: ^OML_Parser, id: xml.Element_ID, parent: ^Node, hook: Node
 
   node := create_node(p, elem)
   node.parent = parent
+
+  node.style = new(Node_Style, p.allocator)
+  node.style.sizing.width.type = .Auto
+  node.style.sizing.height.type = .Auto
+  node.style.layout.direction = .Vertical
+  node.applied_styles = make(map[string]^Node_Style, p.allocator)
+
   set_node_attributes(p, node, elem)
 
   if hook != nil {
-    hook(p, node, elem)
+    hook(p, node, elem) // run the node hook if specified, lets other things do tasks when a node is made
   }
 
   if children, has_children := node_children(node); has_children {
@@ -411,7 +425,6 @@ parse_node :: proc(p: ^OML_Parser, id: xml.Element_ID, parent: ^Node, hook: Node
           node.text = strings.clone(content, p.allocator)
         }
       case xml.Element_ID:
-
         append(children, parse_node(p, child, node, hook))
       }
     }
@@ -447,9 +460,9 @@ parse_oml :: proc(p: ^OML_Parser, hook: Node_Hook = nil) {
 
 	  parse_css(c)
     append(&c.doc.loaded_styles, c.sheet)
-    free(c)
+    // free(c)
 	}
-	
+
 	p.xdoc = nil
 	log.infof("tree %#v", p.doc.tree.derived)
 	log.infof("styles %#v", p.doc.loaded_styles[:])

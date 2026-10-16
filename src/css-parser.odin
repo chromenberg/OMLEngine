@@ -644,7 +644,7 @@ parse_declaration_list :: proc(p: ^CSS_Parser) -> [dynamic]^CSS_Declaration {
 
     declaration := parse_declaration(p)
     if declaration == nil {
-      // recover: drop tokens until the next declaration boundary
+      // drop tokens until the next declaration
       for !css_at(p, .Semicolon) && !css_at(p, .Close_Brace) && !css_at(p, .EOF) {
         css_advance(p)
       }
@@ -683,6 +683,7 @@ parse_rule :: proc(p: ^CSS_Parser) -> ^CSS_Rule {
   return rule
 }
 
+// Computes specificity following the W3 css standard
 @(private="file")
 compute_specificity :: proc(parts: [dynamic]^CSS_Compound) -> [3]int {
   spec: [3]int

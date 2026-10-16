@@ -6,6 +6,16 @@ import "core:log"
 import "core:mem"
 import "core:fmt"
 import oml "../../src"
+import "../../src/renderer"
+
+schedule_draw :: proc(w: ^renderer.Renderer) {
+	oml.timeout(1000_000, w, proc(op: ^oml.Event_Op, w: ^renderer.Renderer) {
+		renderer.draw(w)
+		log.logf(.Info, "drawing")
+
+		schedule_draw(w)
+	})
+}
 
 main :: proc() {
 	context.logger = log.create_console_logger(.Debug)
@@ -26,26 +36,33 @@ main :: proc() {
 			mem.tracking_allocator_destroy(&track)
 		}
 	}
-
-	doc: oml.Document
-	doc.file.src = "examples/vortex/resources/pages/vortex-launcher.oml"
+	r := renderer.init()
+	// doc: oml.Document
+	r.document.file.src = "examples/vortex/resources/pages/vortex-launcher.oml"
 
 	oml.start_event_loop()
 	defer oml.close_event_loop()
 
-	oml.init(&doc)
-	defer oml.clean_doc(&doc)
+	oml.init(r.document)
+	defer oml.clean_doc(r.document)
 
 	oml_parse : oml.OML_Parser
-	oml_parse.allocator = doc.allocator
-	oml_parse.arena = doc.arena
-	oml_parse.doc = &doc
-	oml_parse.file = doc.file
+	oml_parse.allocator = r.document.allocator
+	oml_parse.arena = r.document.arena
+	oml_parse.doc = r.document
+	oml_parse.file = r.document.file
 
 
 	oml.schedule(&oml_parse, proc(op: ^oml.Event_Op, p: ^oml.OML_Parser) {
 		oml.parse_oml(p)
+		log.logf(.Info, "Successfully parsed OML document and its render-blocking imports.")
+		oml.find_styles(p.doc, p.doc.tree)
 	})
 
+	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
+		renderer.reflow(r)
+	})
+
+	// schedule_draw(r)
 	oml.wake_loop()
 }
