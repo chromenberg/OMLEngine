@@ -23,7 +23,7 @@ SDL_Data :: struct {
 }
 
 Render_Properties :: struct {
-	viewport: 	Scale,
+	viewport: 	Scale `{x = 640, y = 480}`,
 	window: 		Scale,
 	vsync: 			bool,
 	fps_cap: 		int
@@ -42,6 +42,7 @@ Renderer :: struct {
 init :: proc(/* r: ^Renderer */) -> ^Renderer {
 	r := new(Renderer)
 	r.allocator = runtime.heap_allocator()
+	r.document = new(oml.Document)
 	// mem.dynamic_arena_init(r._arena, r.allocator, r.allocator)
 	// r.arena = mem.dynamic_arena_allocator(r._arena)
 
@@ -52,4 +53,9 @@ init :: proc(/* r: ^Renderer */) -> ^Renderer {
 
 draw_frame :: proc(r: ^Renderer) {
 
+}
+
+
+viewport_size :: #force_inline proc(r: ^Renderer) -> (width, height: f32) {
+	return r.info.viewport.x, r.info.viewport.y
 }
