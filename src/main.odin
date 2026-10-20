@@ -41,7 +41,26 @@ Parser :: struct {
 	source: string,
 }
 
+Op_Kind :: enum {
+	Rect,
+	Rounded_Rect,
+	Border,
+	Text,
+	Circle,
+}
 
+Color :: struct {
+	r,g,b,a: f32
+}
+
+Render_Op :: struct {
+	kind: Op_Kind,
+	box: Box,
+	radius: f32,
+	color: Color,
+	thickness: f32,
+	opacity: f32,
+}
 
 init :: proc(doc: ^Document) {
 	// context.logger = log.create_console_logger()

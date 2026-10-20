@@ -34,18 +34,16 @@ calculate_size :: proc(s: oml.Sizing_Value, avail: f32) -> f32 {
 	return avail
 }
 
-calculate_height :: proc(s: oml.Sizing_Value, height, remaining: f32) -> f32 {
+calculate_height :: proc(s: oml.Sizing_Value, content_height, avail_height: f32) -> f32 {
 	switch s.type {
 	case .Absolute:
 		return s.val
 	case .Percent:
-		// 0% - 100%
-		// parent width / val
-		return remaining * (s.val/100)
+		return avail_height * (s.val / 100)
 	case .Auto:
-		return remaining
+		return content_height
 	}
-	return remaining
+	return content_height
 }
 
 content_offset :: proc(n: ^oml.Node) -> (inset_h, inset_v: f32) {
@@ -60,6 +58,7 @@ content_offset :: proc(n: ^oml.Node) -> (inset_h, inset_v: f32) {
 
 // TODO: test this and make sure its working properly
 calculate_layout :: proc(n: ^oml.Node, x, y, width_avail, height_avail: f32) {
+	if n == nil do return
 
 	inset_h, inset_v := content_offset(n)
 	// calc the width using the width and how much space is left
@@ -84,7 +83,7 @@ calculate_layout :: proc(n: ^oml.Node, x, y, width_avail, height_avail: f32) {
 
 	switch n.style.layout.direction {
 	case .Vertical:
-		content_h = layout_vertical(n, content_x, content_y, content_w)
+		content_h = layout_vertical(n, content_x, content_y, content_w, height_avail)
 	case .Horizontal:
 		content_h = layout_horizontal(n, content_x, content_y, content_w, content_horizontal(n.style.sizing.height, height_avail, inset_v))
 	}
@@ -94,26 +93,23 @@ calculate_layout :: proc(n: ^oml.Node, x, y, width_avail, height_avail: f32) {
 	n.render.cur_box.content_h = max(outside_height - inset_v, 0)
 }
 
-// calculates vertically oriented element,s returns the offset caused by the element
-layout_vertical :: proc(n: ^oml.Node, child_x, child_y, parent_width: f32) -> f32 {
+// calculates vertically oriented elements, returns the offset caused by the element
+layout_vertical :: proc(n: ^oml.Node, child_x, child_y, parent_width, height_avail: f32) -> f32 {
 	offset := f32(0)
-	// total children layed out
-	count := 0
 	for child in n.children {
 		// to get the available width, subtract the parent width by the childs margins
 		width_avail := parent_width - get_layout(child).margin.left.val - get_layout(child).margin.right.val
+		child_height_avail := height_avail - get_layout(child).margin.top.val - get_layout(child).margin.bottom.val
 		// add the "offset", accumulated offset of the previous elements
-		calculate_layout(child, child_x, child_y + offset + get_layout(child).margin.top.val, width_avail, 0)
+		calculate_layout(child, child_x, child_y + offset + get_layout(child).margin.top.val, width_avail, child_height_avail)
 
 		// add the total box sizing of this node to the offset
 		offset += get_layout(child).margin.top.val + child.render.cur_box.h + get_layout(child).margin.bottom.val
-		count += 1
-
 	}
 	return offset
 }
 
-// calculates vertically oriented element,s returns the offset caused by the element
+// calculates vertically oriented elements returns the offset caused by the element
 layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_height: f32) -> (max_height: f32) {
 	offset := f32(0)
 	count := 0
@@ -133,7 +129,7 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 	}
 
 	gap_total := n.style.layout.gap
-	// remaining space is the parent width - flex width - space used for gaps
+	// remaining space is the parent width
 	remaining := parent_width - const_width - gap_total
 	// if the width expanded > 0, divide remaining space by the times it expanded
 	flex_width := expand_amount > 0 ? max(remaining, 0) / f32(expand_amount) : 0
@@ -190,6 +186,7 @@ content_horizontal :: proc(s: oml.Sizing_Value, height, inset: f32) -> f32 {
 //
 // used for seeing if the element should be rerendered
 snapshot :: proc(n: ^oml.Node) {
+	if n == nil do return
 	n.render.old_box = n.render.cur_box // store "current" bounds, beofore changes happen
 	for child in n.children do snapshot(child) // dfs
 }
@@ -197,8 +194,15 @@ snapshot :: proc(n: ^oml.Node) {
 // Pass in the renderer because it is cleaner when calling
 // the renderer also contains all the needed information like width and height
 reflow :: proc(r: ^Renderer) {
-	fmt.printfln("starting reflow for document")	
-	snapshot(r.document.tree)
-	calculate_layout(r.document.tree, 0, 0, viewport_size(r))
+	if r == nil || r.document == nil || r.document.tree == nil do return
+	fmt.printfln("starting reflow for document")
+
+	root := r.document.tree
+	w, h := viewport_size(r)
+	root.style.sizing.width = {.Absolute, w}
+	root.style.sizing.height = {.Absolute, h}
+
+	snapshot(root)
+	calculate_layout(root, 0, 0, w, h)
 	fmt.printfln("completed reflow for document")
 }

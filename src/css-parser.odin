@@ -414,7 +414,8 @@ parse_simple :: proc(p: ^CSS_Parser) -> ^CSS_Simple_Selector {
     css_advance(p)
     s := new_css_node(CSS_Simple_Selector, tok.pos, p.allocator)
     s.kind = .Id
-    s.name = strings.clone(tok.text, p.allocator)
+    // exclude leading # in a #id
+    s.name = strings.clone(tok.text[1:], p.allocator)
     return s
   case .Open_Bracket:
     return parse_attribute(p)

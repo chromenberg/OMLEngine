@@ -140,3 +140,20 @@ read_file :: nbio.read_entire_file
 Read_Err :: nbio.Read_Entire_File_Error
 
 Event_Op :: nbio.Operation
+
+tick_loop :: proc() {
+	when ODIN_DEBUG {
+		// before := pending_events()
+		err := nbio.tick()
+		// after := pending_events()
+		// log.logf(.Debug, "Events Queued: %d | Events Remaining: %d", after, before - after)
+		if err != .None {
+			log.logf(.Error, "Event loop error: %v", err)
+		}
+	} else {
+		err := nbio.tick()
+		if err != .None {
+			log.logf(.Error, "Event loop error: %v", err)
+		}
+	}
+}

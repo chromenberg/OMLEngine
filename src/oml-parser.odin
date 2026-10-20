@@ -85,6 +85,7 @@ Render_Info :: struct {
   // every element made is automatically dirtied to force the renderer to paint it
   // then this value is reset
   dirty: Dirty_Flags,
+  ops: [dynamic]Render_Op,
   cur_box: Box,
   old_box: Box
 }
@@ -93,12 +94,6 @@ Node_Cached :: struct {
   font_id: int,
 }
 
-Color :: struct {
-  r: int,
-  g: int,
-  b: int,
-  a: int,
-}
 
 Sizing_Type :: enum {
   Absolute,
@@ -228,6 +223,12 @@ Node_Style :: struct {
   layout: Style_Layout,
   border: Style_Border,
   clip: Style_Clipping,
+  color: Color,
+  background_color: Color,
+  opacity: f32,
+  radius: f32,
+
+  has_border, has_bg, visible: bool
 }
 
 Node :: struct {
@@ -408,6 +409,8 @@ parse_node :: proc(p: ^OML_Parser, id: xml.Element_ID, parent: ^Node, hook: Node
   node.style.sizing.width.type = .Auto
   node.style.sizing.height.type = .Auto
   node.style.layout.direction = .Vertical
+  node.style.opacity = 1
+  node.style.visible = true
   node.applied_styles = make(map[string]^Node_Style, p.allocator)
 
   set_node_attributes(p, node, elem)

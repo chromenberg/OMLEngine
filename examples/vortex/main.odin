@@ -9,16 +9,38 @@ import "core:fmt"
 import oml "../../src"
 import "../../src/renderer"
 
-schedule_draw :: proc(w: ^renderer.Renderer) {
-	oml.timeout(1000_000, w, proc(op: ^oml.Event_Op, w: ^renderer.Renderer) {
-		renderer.draw(w)
-		schedule_draw(w)
+schedule_repaint :: proc(w: ^renderer.Renderer) {
+	oml.schedule(w, proc(op: ^oml.Event_Op, w: ^renderer.Renderer) {
+		log.logf(.Debug, "Drawing")
+
+		renderer.paint(w, w.deltas)
+		w.deltas = {}
 	})
 }
+schedule_deltas :: proc(r: ^renderer.Renderer) {
+	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
+		d_change := false
+		renderer.get_deltas(r.document.tree, &r.deltas, &d_change)
 
+		if d_change {
+			renderer.update_dirty(r.document.tree)
+			renderer.paint(r, r.deltas)
+			r.deltas = {}
+		}
+
+		schedule_deltas(r)
+	})
+}
 schedule_reflow :: proc (r: ^renderer.Renderer) {
 	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
 		renderer.reflow(r)
+	})
+}
+
+schedule_draw :: proc (r: ^renderer.Renderer) {
+	oml.timeout(16_000_000, r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
+		renderer.draw_screen(r)
+		schedule_draw(r)
 	})
 }
 
@@ -60,11 +82,14 @@ main :: proc() {
 
 	oml.schedule(&oml_parse, proc(op: ^oml.Event_Op, p: ^oml.OML_Parser) {
 		oml.parse_oml(p)
+		p.doc.tree.render.dirty = {.Layout, .Paint, .Style}
 		log.logf(.Info, "Successfully parsed OML document and its render-blocking imports.")
 		oml.find_styles(p.doc, p.doc.tree)
 	})
 
 	schedule_reflow(r)
+	schedule_deltas(r)
+	schedule_draw(r)
 
 	mainloop: for {
 		for e: sdl3.Event; sdl3.PollEvent(&e); {
@@ -72,13 +97,14 @@ main :: proc() {
 			case .QUIT, .WINDOW_CLOSE_REQUESTED, .LOW_MEMORY:
 				log.log(.Debug, "Requested program close")
 				break mainloop
-			case .WINDOW_MOVED:
+			case .WINDOW_RESIZED:
 				log.log(.Debug, "Window has been resized. Need to reflow layout.")
-				// schedule_reflow(r)
+				renderer.set_window_size(r, f32(e.display.data2), f32(e.display.data2))
+				renderer.rebuild_texture(r)
+				schedule_reflow(r)
 			}
 		}
 
-		schedule_draw(r)
-		nbio.tick()
+		oml.tick_loop()
 	}
 }
