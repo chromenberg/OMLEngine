@@ -79,8 +79,8 @@ create_texture :: proc(r: ^Renderer) -> ^sdl3.Texture {
 }
 
 rebuild_texture :: proc(r: ^Renderer) {
-	tex := r.sdl.texture
-	r.sdl.texture = create_texture(r)
-	sdl3.DestroyTexture(tex)
+	// tex := r.sdl.texture
+	// r.sdl.texture = create_texture(r)
+	// sdl3.DestroyTexture(tex)
 	// free(tex)
 }

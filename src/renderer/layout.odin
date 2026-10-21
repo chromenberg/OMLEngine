@@ -1,6 +1,5 @@
 package renderer
 
-import "core:fmt"
 import oml "../"
 
 get_layout :: #force_inline proc(n: ^oml.Node) -> oml.Style_Layout {
@@ -79,13 +78,16 @@ calculate_layout :: proc(n: ^oml.Node, x, y, width_avail, height_avail: f32) {
 	n.render.cur_box.content_y = content_y
 	n.render.cur_box.content_w = content_w
 
+	// children resolve percentages from the parent box, not available area handed as that wont have inset calcs yet
+	inner_h := content_horizontal(n.style.sizing.height, height_avail, inset_v)
+
 	content_h:= f32(0)
 
 	switch n.style.layout.direction {
 	case .Vertical:
-		content_h = layout_vertical(n, content_x, content_y, content_w, height_avail)
+		content_h = layout_vertical(n, content_x, content_y, content_w, inner_h)
 	case .Horizontal:
-		content_h = layout_horizontal(n, content_x, content_y, content_w, content_horizontal(n.style.sizing.height, height_avail, inset_v))
+		content_h = layout_horizontal(n, content_x, content_y, content_w, inner_h)
 	}
 
 	outside_height := max(calculate_height(n.style.sizing.height, content_h + inset_v, height_avail), 0)
@@ -114,21 +116,24 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 	offset := f32(0)
 	count := 0
 
-	const_width := f32(0) // width this element will try to have all the time
+	const_width := f32(0) // space that is already taken by children with a fixed width
 	expand_amount := 0
 	for child in n.children {
 		margins := child.style.layout.margin.left.val + child.style.layout.margin.right.val
 		switch child.style.sizing.width.type {
 		case .Absolute:
-			const_width = child.style.sizing.width.val + margins
+			// every fixed child takes up space, not just the last one
+			const_width += child.style.sizing.width.val + margins
 		case .Percent:
-			const_width = parent_width * (child.style.sizing.width.val / 100)
+			const_width += parent_width * (child.style.sizing.width.val / 100) + margins
 		case .Auto:
 			expand_amount += 1
 		}
 	}
 
-	gap_total := n.style.layout.gap
+	gap := n.style.layout.gap
+	// a gap only sits *between* children, so there is one less gap than children
+	gap_total := gap * f32(max(len(n.children) - 1, 0))
 	// remaining space is the parent width
 	remaining := parent_width - const_width - gap_total
 	// if the width expanded > 0, divide remaining space by the times it expanded
@@ -150,7 +155,10 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 			width = flex_width - (margin_left + margin_right)
 		}
 
-		// add the "offset", accumulated offset of the previous elements
+		// skip the gap if theres only 1 or less child
+		if count > 0 do offset += gap
+
+		// add the accumulated offset caused by all the parent / sibling elements
 		calculate_layout(
 			child,
 			child_x + offset + margin_left,
@@ -187,22 +195,21 @@ content_horizontal :: proc(s: oml.Sizing_Value, height, inset: f32) -> f32 {
 // used for seeing if the element should be rerendered
 snapshot :: proc(n: ^oml.Node) {
 	if n == nil do return
-	n.render.old_box = n.render.cur_box // store "current" bounds, beofore changes happen
-	for child in n.children do snapshot(child) // dfs
+	// set the old box to the current box as the current will be changing this reflow
+	n.render.old_box = n.render.cur_box
+	for child in n.children do snapshot(child)
 }
 
 // Pass in the renderer because it is cleaner when calling
 // the renderer also contains all the needed information like width and height
 reflow :: proc(r: ^Renderer) {
 	if r == nil || r.document == nil || r.document.body == nil do return
-	fmt.printfln("starting reflow for document")
 
 	root := r.document.body
 	w, h := viewport_size(r)
-	root.style.sizing.width = {.Absolute, w}
-	root.style.sizing.height = {.Absolute, h}
+	// root.style.sizing.width = {.Absolute, w}
+	// root.style.sizing.height = {.Absolute, h}
 
 	snapshot(root)
 	calculate_layout(root, 0, 0, w, h)
-	fmt.printfln("completed reflow for document")
 }

@@ -155,30 +155,40 @@ all_names_match :: proc(n: ^Node, s: [dynamic]^CSS_Simple_Selector) -> bool {
 }
 
 simple_selector_matches :: proc(n: ^Node, sel: ^CSS_Simple_Selector) -> bool {
+	// TODO: Add a hook that calls back to the document when theres an error
+	// This can be used for logging in a console, or in future, and embedded console accessible within the renderer
+	// This will silently error making a fucking nightmare to debug if this causes an error
 	if n == nil || sel == nil do return false
 
 	#partial switch sel.kind {
 	case .Universal:
 		return true
 	case .Type:
+		// Match against tagname
 		return n.tag == sel.name
 	case .Class:
-		// the selector name used to be empty, which can never match a real class
+		// if the selector name is empty then why are we matching it
 		if len(sel.name) == 0 do return false
+		
+		// If a single class matches then we return true
 		for c in n.class {
 			if sel.name == c do return true
 		}
 		return false
 	case .Id:
-		// an empty id must never match, otherwise idless nodes match every #id rule
+		// empty ids should not work for either selector or node
 		if len(n.id) == 0 || len(sel.name) == 0 do return false
 		return sel.name == n.id
 	}
 
-	// attribute and pseudo-class selectors are not supported yet, treat them as a non-match
+	// Other cases handled here
+	// [attr="value"] | [attr=*"value"]
+	// :hover
+	
 	return false
 }
 
+// Search the nodes parents children (siblings) until we find the current node, the return the node before that
 previous_sibling :: proc(n: ^Node) -> ^Node {
 	p := n.parent
 	if p == nil do return nil
@@ -192,6 +202,7 @@ previous_sibling :: proc(n: ^Node) -> ^Node {
 }
 
 // Matches right to left, `index` is the compound selector that has to match `n`
+// Recursively searches for matches
 matches_selector_at :: proc(n: ^Node, s: ^CSS_Selector, index: int) -> bool {
 	if n == nil do return false
 	if !all_names_match(n, s.parts[index].simples) do return false
@@ -201,6 +212,8 @@ matches_selector_at :: proc(n: ^Node, s: ^CSS_Selector, index: int) -> bool {
 	case .Child:
 		return matches_selector_at(n.parent, s, index - 1)
 	case .Descendant:
+		// while the node parent is not nil, we update the `parent` value to be 
+		// the next elements parent and redo the search
 		for parent := n.parent; parent != nil; parent = parent.parent {
 			if matches_selector_at(parent, s, index - 1) do return true
 		}
@@ -225,15 +238,15 @@ matches_selector :: proc(n: ^Node, s: ^CSS_Selector) -> bool {
 find_styles :: proc(d: ^Document, n: ^Node) {
 	if n == nil do return
 
-	for sheet in d.loaded_styles {
-		for rule in sheet.rules {
-			for selec in rule.selectors {
-				for comp in selec.parts {
-					if all_names_match(n, comp.simples) {
-						for decl in rule.declarations {
-							set_declaration(n, decl)
-						}
+	for sheet in d.loaded_styles { // for every stylesheet
+		for rule in sheet.rules { // for every rule in every stylesheet
+			for selec in rule.selectors { // for every selector in every rule in every stylesheet
+				// a rule applies at most once, even when several of its selectors match
+				if matches_selector(n, selec) { // if we match a selector, then for
+					for decl in rule.declarations { // every property in every rule in every stylesheet
+						set_declaration(n, decl) // apply the property to the node
 					}
+					break
 				}
 			}
 		}

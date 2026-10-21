@@ -23,7 +23,7 @@ init_rend :: proc(r: ^Renderer) {
 	r.sdl.render = sdl3.CreateRenderer(r.sdl.window, nil)
 	if r.sdl.render == nil do panic(fmt.tprintf("Failed to create renderer: %s", string(sdl3.GetError())))
 
-	sdl3.SetRenderLogicalPresentation(r.sdl.render, get_size(r), .LETTERBOX)
+	sdl3.SetRenderLogicalPresentation(r.sdl.render, get_size(r), sdl3.RendererLogicalPresentation.OVERSCAN)
 	sdl3.RenderPresent(r.sdl.render)
 }
 
