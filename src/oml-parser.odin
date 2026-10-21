@@ -235,6 +235,7 @@ Node :: struct {
   render: Render_Info, // info for rendering a node
   derived: Any_Node, // type that is inheriting the node
   parent: ^Node, // node parent
+  tag: string, // the element name as written in the OML, used by type selectors
   id: string,
   class: [dynamic]string,
   text: string,
@@ -404,6 +405,8 @@ parse_node :: proc(p: ^OML_Parser, id: xml.Element_ID, parent: ^Node, hook: Node
 
   node := create_node(p, elem)
   node.parent = parent
+  // keep the raw element name so type selectors (`div`, `text`, ...) can match
+  node.tag = strings.clone(elem.ident, p.allocator)
 
   node.style = new(Node_Style, p.allocator)
   node.style.sizing.width.type = .Auto
@@ -423,7 +426,7 @@ parse_node :: proc(p: ^OML_Parser, id: xml.Element_ID, parent: ^Node, hook: Node
   if elem.ident == "head" {
     p.doc.head = node
   }
-  
+
   if hook != nil {
     hook(p, node, elem) // run the node hook if specified, lets other things do tasks when a node is made
   }

@@ -148,18 +148,78 @@ set_declaration :: proc(n: ^Node, d: ^CSS_Declaration) {
 }
 
 all_names_match :: proc(n: ^Node, s: [dynamic]^CSS_Simple_Selector) -> bool {
-	matches := 0
 	for sel in s {
-		#partial switch sel.kind {
-		case .Class:
-			for c in n.class {
-				if sel.value == c do matches += 1
-			}
-		case .Id:
-			if sel.value == n.id do matches += 1
-		}
+		if !simple_selector_matches(n, sel) do return false
 	}
-	return matches == len(s[:])
+	return true
+}
+
+simple_selector_matches :: proc(n: ^Node, sel: ^CSS_Simple_Selector) -> bool {
+	if n == nil || sel == nil do return false
+
+	#partial switch sel.kind {
+	case .Universal:
+		return true
+	case .Type:
+		return n.tag == sel.name
+	case .Class:
+		// the selector name used to be empty, which can never match a real class
+		if len(sel.name) == 0 do return false
+		for c in n.class {
+			if sel.name == c do return true
+		}
+		return false
+	case .Id:
+		// an empty id must never match, otherwise idless nodes match every #id rule
+		if len(n.id) == 0 || len(sel.name) == 0 do return false
+		return sel.name == n.id
+	}
+
+	// attribute and pseudo-class selectors are not supported yet, treat them as a non-match
+	return false
+}
+
+previous_sibling :: proc(n: ^Node) -> ^Node {
+	p := n.parent
+	if p == nil do return nil
+
+	prev: ^Node = nil
+	for child in p.children {
+		if child == n do return prev
+		prev = child
+	}
+	return nil
+}
+
+// Matches right to left, `index` is the compound selector that has to match `n`
+matches_selector_at :: proc(n: ^Node, s: ^CSS_Selector, index: int) -> bool {
+	if n == nil do return false
+	if !all_names_match(n, s.parts[index].simples) do return false
+	if index == 0 do return true
+
+	#partial switch s.parts[index - 1].combinator {
+	case .Child:
+		return matches_selector_at(n.parent, s, index - 1)
+	case .Descendant:
+		for parent := n.parent; parent != nil; parent = parent.parent {
+			if matches_selector_at(parent, s, index - 1) do return true
+		}
+		return false
+	case .Adjacent:
+		return matches_selector_at(previous_sibling(n), s, index - 1)
+	case .Sibling:
+		for sibling := previous_sibling(n); sibling != nil; sibling = previous_sibling(sibling) {
+			if matches_selector_at(sibling, s, index - 1) do return true
+		}
+		return false
+	}
+
+	return false
+}
+
+matches_selector :: proc(n: ^Node, s: ^CSS_Selector) -> bool {
+	if n == nil || s == nil || len(s.parts) == 0 do return false
+	return matches_selector_at(n, s, len(s.parts) - 1)
 }
 
 find_styles :: proc(d: ^Document, n: ^Node) {
