@@ -143,10 +143,10 @@ Event_Op :: nbio.Operation
 
 tick_loop :: proc() {
 	when ODIN_DEBUG {
-		// before := pending_events()
+		before := pending_events()
 		err := nbio.tick()
-		// after := pending_events()
-		// log.logf(.Debug, "Events Queued: %d | Events Remaining: %d", after, before - after)
+		after := pending_events()
+		log.logf(.Debug, "Events Queued: %d | Events Remaining: %d", after, before - after)
 		if err != .None {
 			log.logf(.Error, "Event loop error: %v", err)
 		}

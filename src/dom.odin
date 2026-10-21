@@ -26,6 +26,51 @@ parse_type :: proc(n: ^Sizing_Value, d: string) {
 	}
 }
 
+// Resolves a length that has no percentage base to resolve against, like a gap or a corner
+// radius. `8`, `8px` and `8.5px` all read as 8, the type is kept only by `parse_type`.
+parse_length :: proc(value: string) -> f32 {
+	length: Sizing_Value
+	parse_type(&length, value)
+	return length.val
+}
+
+// TODO: Remake this
+parse_sides :: proc(sides: ^Style_Side_Sizes, value: string) -> bool {
+	values := strings.fields(value, context.temp_allocator)
+	if len(values) == 0 || len(values) > 4 do return false
+
+	// a single value applies to every side, the shorter shorthands override from there
+	top, right, bottom, left := values[0], values[0], values[0], values[0]
+	switch len(values) {
+	case 2:
+		right, left = values[1], values[1]
+	case 3:
+		right, left = values[1], values[1]
+		bottom = values[2]
+	case 4:
+		right, bottom, left = values[1], values[2], values[3]
+	}
+
+	parse_type(&sides.top,    top)
+	parse_type(&sides.right,  right)
+	parse_type(&sides.bottom, bottom)
+	parse_type(&sides.left,   left)
+	return true
+}
+
+// Parses opacity
+parse_opacity :: proc(value: string) -> f32 {
+	text := strings.trim_space(value)
+
+	if strings.ends_with(text, "%") {
+		if percent, ok := strconv.parse_f32(text[:len(text) - 1]); ok do return percent / 100
+		return 1
+	}
+
+	if opacity, ok := strconv.parse_f32(text); ok do return opacity
+	return 1
+}
+
 parse_hex_byte :: proc(text: string) -> (u8, bool) {
   value, ok := strconv.parse_int(text, 16)
   if !ok do return 0, false
@@ -73,45 +118,10 @@ set_declaration :: proc(n: ^Node, d: ^CSS_Declaration) {
 		parse_type(&n.style.sizing.height, d.value)
 
 	case "padding":
-		// this needs to be allocated using the documents allocator as this creates a large memory leak
-		vals := strings.split(d.value, " ")
-		switch len(vals) {
-		case 1:
-			parse_type(&n.style.layout.padding.top,    vals[0])
-			parse_type(&n.style.layout.padding.bottom, vals[0])
-			parse_type(&n.style.layout.padding.left,   vals[0])
-			parse_type(&n.style.layout.padding.right,  vals[0])
-		case 2:
-			parse_type(&n.style.layout.padding.top,    vals[0])
-			parse_type(&n.style.layout.padding.bottom, vals[0])
-			parse_type(&n.style.layout.padding.left,   vals[1])
-			parse_type(&n.style.layout.padding.right,  vals[1])
-		case 4:
-			parse_type(&n.style.layout.padding.top,    vals[0])
-			parse_type(&n.style.layout.padding.right,  vals[1])
-			parse_type(&n.style.layout.padding.bottom, vals[2])
-			parse_type(&n.style.layout.padding.left,   vals[3])
-		}
+		parse_sides(&n.style.layout.padding, d.value)
 
 	case "margin":
-		vals := strings.split(d.value, " ")
-		switch len(vals) {
-		case 1:
-			parse_type(&n.style.layout.margin.top,    vals[0])
-			parse_type(&n.style.layout.margin.bottom, vals[0])
-			parse_type(&n.style.layout.margin.left,   vals[0])
-			parse_type(&n.style.layout.margin.right,  vals[0])
-		case 2:
-			parse_type(&n.style.layout.margin.top,    vals[0])
-			parse_type(&n.style.layout.margin.bottom, vals[0])
-			parse_type(&n.style.layout.margin.left,   vals[1])
-			parse_type(&n.style.layout.margin.right,  vals[1])
-		case 4:
-			parse_type(&n.style.layout.margin.top,    vals[0])
-			parse_type(&n.style.layout.margin.right,  vals[1])
-			parse_type(&n.style.layout.margin.bottom, vals[2])
-			parse_type(&n.style.layout.margin.left,   vals[3])
-		}
+		parse_sides(&n.style.layout.margin, d.value)
 
 	case "direction":
 		switch d.value {
@@ -120,7 +130,7 @@ set_declaration :: proc(n: ^Node, d: ^CSS_Declaration) {
 		}
 
 	case "gap":
-		n.style.layout.gap, _ = strconv.parse_f32(d.value)
+		n.style.layout.gap = parse_length(d.value)
 
 	case "background-color":
 		n.style.has_bg = true
@@ -130,9 +140,7 @@ set_declaration :: proc(n: ^Node, d: ^CSS_Declaration) {
 		n.style.color = parse_color(d.value)
 
 	case "border-width":
-		v: Sizing_Value
-		parse_type(&v, d.value)
-		n.style.border.width = {v, v, v, v}
+		parse_sides(&n.style.border.width, d.value)
 		n.style.has_border = true
 
 	case "border-color":
@@ -140,10 +148,10 @@ set_declaration :: proc(n: ^Node, d: ^CSS_Declaration) {
 		n.style.has_border = true
 
 	case "corner-radius":
-		n.style.radius, _ = strconv.parse_f32(d.value)
+		n.style.radius = parse_length(d.value)
 
 	case "opacity":
-		n.style.opacity, _ = strconv.parse_f32(d.value)
+		n.style.opacity = parse_opacity(d.value)
 	}
 }
 
@@ -169,7 +177,7 @@ simple_selector_matches :: proc(n: ^Node, sel: ^CSS_Simple_Selector) -> bool {
 	case .Class:
 		// if the selector name is empty then why are we matching it
 		if len(sel.name) == 0 do return false
-		
+
 		// If a single class matches then we return true
 		for c in n.class {
 			if sel.name == c do return true
@@ -184,7 +192,7 @@ simple_selector_matches :: proc(n: ^Node, sel: ^CSS_Simple_Selector) -> bool {
 	// Other cases handled here
 	// [attr="value"] | [attr=*"value"]
 	// :hover
-	
+
 	return false
 }
 
@@ -212,7 +220,7 @@ matches_selector_at :: proc(n: ^Node, s: ^CSS_Selector, index: int) -> bool {
 	case .Child:
 		return matches_selector_at(n.parent, s, index - 1)
 	case .Descendant:
-		// while the node parent is not nil, we update the `parent` value to be 
+		// while the node parent is not nil, we update the `parent` value to be
 		// the next elements parent and redo the search
 		for parent := n.parent; parent != nil; parent = parent.parent {
 			if matches_selector_at(parent, s, index - 1) do return true

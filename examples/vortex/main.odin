@@ -28,7 +28,7 @@ schedule_deltas :: proc(r: ^renderer.Renderer) {
 			r.deltas = {}
 		}
 
-		schedule_deltas(r)
+		draw_now(r)
 	})
 }
 schedule_reflow :: proc (r: ^renderer.Renderer) {
@@ -44,6 +44,36 @@ schedule_draw :: proc (r: ^renderer.Renderer) {
 	})
 }
 
+draw_now :: proc (r: ^renderer.Renderer) {
+	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
+		renderer.draw_screen(r)
+	})
+}
+clear_now :: proc (r: ^renderer.Renderer) {
+	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
+		renderer.clear_screen(r)
+	})
+}
+
+// Sequentially recalculates everything, 
+// builds texture -> reflow -> deltas -> repaint -> clear
+full_recalc :: proc(r: ^renderer.Renderer) {
+	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
+		renderer.rebuild_texture(r) // Takes too long when window is large 
+		renderer.reflow(r)
+		
+		d_change := false
+		renderer.get_deltas(r.document.body, &r.deltas, &d_change)
+
+		if d_change {
+			renderer.update_dirty(r.document.body)
+			renderer.paint(r, r.deltas)
+			r.deltas = {}
+		}
+		
+		renderer.draw_screen(r)
+	})
+}
 main :: proc() {
 	context.logger = log.create_console_logger(.Debug)
 	when ODIN_DEBUG {
@@ -89,22 +119,32 @@ main :: proc() {
 
 	schedule_reflow(r)
 	schedule_deltas(r)
-	schedule_draw(r)
+	schedule_draw(r) // this starts a loop
 
 	mainloop: for {
+		// clear_now(r)
+		
 		for e: sdl3.Event; sdl3.PollEvent(&e); {
 			#partial switch e.type {
 			case .QUIT, .WINDOW_CLOSE_REQUESTED, .LOW_MEMORY:
 				log.log(.Debug, "Requested program close")
 				break mainloop
 			case .WINDOW_RESIZED:
-				log.log(.Debug, "Window has been resized. Need to reflow layout.")
+				// clear_now(r)
+				log.logf(.Info, "Window has been resized. Recalculating layout.")
 				renderer.set_window_size(r, f32(e.display.data1), f32(e.display.data2))
-				renderer.rebuild_texture(r)
-				schedule_reflow(r)
+				full_recalc(r)
+			case .MOUSE_MOTION:
+				// This just runs (getmousepos), even though this event passes out the data of the mouse move
+				renderer.update_mouse(r)	
 			}
 		}
 
+		// Right now reflows and paint changes are only ticked for resizes
+		// However we should check when something is dirty and recalculate that
+		
+		schedule_reflow(r) // Recalculate layout every tick / TODO: Only recalc when needed 
+		schedule_deltas(r) // Recalculate paint every tick / TODO: Only recalc when needed
 		oml.tick_loop()
 	}
 }

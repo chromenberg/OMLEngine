@@ -103,7 +103,7 @@ set_deltas :: proc(b: ^oml.Box, r: oml.Box) {
 	}
 }
 
-paint :: proc(r: ^Renderer, deltas: oml.Box/* , bg: oml.Color */) {
+paint :: proc(r: ^Renderer, deltas: oml.Box) {
 	if r.sdl.render == nil || r.sdl.texture == nil do return
 
 	w, h := viewport_size(r)
@@ -123,10 +123,6 @@ paint :: proc(r: ^Renderer, deltas: oml.Box/* , bg: oml.Color */) {
 	sdl3.SetRenderClipRect(r.sdl.render, &clip)
 	defer sdl3.SetRenderClipRect(r.sdl.render, nil)
 
-	// renderclear doenst do clipping so a rectangle has to be used instead
-	// sdl3.SetRenderDrawColor(r.sdl.render, u8(bg.r), u8(bg.g), u8(bg.b), u8(bg.a))
-	// fill := sdl3.FRect{x0, y0, x1 - x0, y1 - y0}
-	// sdl3.RenderFillRect(r.sdl.render, &fill)
 
 	paint_nodes(r, r.document.body, deltas)
 }

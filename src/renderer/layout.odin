@@ -2,6 +2,9 @@ package renderer
 
 import oml "../"
 
+// TODO: Too many comments, should just remake this but easier to understand and cleaner
+// A layout-dirtied element should affect itself, and if
+
 get_layout :: #force_inline proc(n: ^oml.Node) -> oml.Style_Layout {
 	return n.style.layout
 }
@@ -45,12 +48,25 @@ calculate_height :: proc(s: oml.Sizing_Value, content_height, avail_height: f32)
 	return content_height
 }
 
-content_offset :: proc(n: ^oml.Node) -> (inset_h, inset_v: f32) {
+resolve_length :: proc(s: oml.Sizing_Value, base: f32) -> f32 {
+	#partial switch s.type {
+	case .Absolute:
+		return s.val
+	case .Percent:
+		return base * (s.val / 100)
+	}
+	return 0
+}
+
+// Resolves the space the border and the padding of a node take up on each axis
+content_offset :: proc(n: ^oml.Node, width_avail, height_avail: f32) -> (inset_h, inset_v: f32) {
 	border := n.style.border.width
 	padding := n.style.layout.padding
 
-	inset_h = border.left.val + border.right.val + padding.left.val + padding.right.val
-	inset_v = border.top.val + border.bottom.val + padding.top.val + padding.bottom.val
+	inset_h = resolve_length(border.left, width_avail) + resolve_length(border.right, width_avail) +
+		resolve_length(padding.left, width_avail) + resolve_length(padding.right, width_avail)
+	inset_v = resolve_length(border.top, height_avail) + resolve_length(border.bottom, height_avail) +
+		resolve_length(padding.top, height_avail) + resolve_length(padding.bottom, height_avail)
 
 	return inset_h, inset_v
 }
@@ -59,7 +75,7 @@ content_offset :: proc(n: ^oml.Node) -> (inset_h, inset_v: f32) {
 calculate_layout :: proc(n: ^oml.Node, x, y, width_avail, height_avail: f32) {
 	if n == nil do return
 
-	inset_h, inset_v := content_offset(n)
+	inset_h, inset_v := content_offset(n, width_avail, height_avail)
 	// calc the width using the width and how much space is left
 	node_w := max(calculate_size(n.style.sizing.width, width_avail), 0)
 	content_w := max(node_w - inset_h, 0)
@@ -71,8 +87,10 @@ calculate_layout :: proc(n: ^oml.Node, x, y, width_avail, height_avail: f32) {
 
 	// these are the X and Y positions child elements need to be drawn at
 	// TODO: shorten the length needed to get a value
-	content_x := x + n.style.border.width.left.val + n.style.layout.padding.left.val
-	content_y := y + n.style.border.width.top.val + n.style.layout.padding.top.val
+	content_x := x + resolve_length(n.style.border.width.left, width_avail) +
+		resolve_length(n.style.layout.padding.left, width_avail)
+	content_y := y + resolve_length(n.style.border.width.top, height_avail) +
+		resolve_length(n.style.layout.padding.top, height_avail)
 
 	n.render.cur_box.content_x = content_x
 	n.render.cur_box.content_y = content_y
@@ -98,15 +116,30 @@ calculate_layout :: proc(n: ^oml.Node, x, y, width_avail, height_avail: f32) {
 // calculates vertically oriented elements, returns the offset caused by the element
 layout_vertical :: proc(n: ^oml.Node, child_x, child_y, parent_width, height_avail: f32) -> f32 {
 	offset := f32(0)
+	gap := n.style.layout.gap
+	count := 0
+
 	for child in n.children {
+		margin := get_layout(child).margin
+		margin_left := resolve_length(margin.left, parent_width)
+		margin_right := resolve_length(margin.right, parent_width)
+		margin_top := resolve_length(margin.top, height_avail)
+		margin_bottom := resolve_length(margin.bottom, height_avail)
+
+		// a gap only sits *between* children, so the first one does not get one
+		if count > 0 do offset += gap
+
 		// to get the available width, subtract the parent width by the childs margins
-		width_avail := parent_width - get_layout(child).margin.left.val - get_layout(child).margin.right.val
-		child_height_avail := height_avail - get_layout(child).margin.top.val - get_layout(child).margin.bottom.val
-		// add the "offset", accumulated offset of the previous elements
-		calculate_layout(child, child_x, child_y + offset + get_layout(child).margin.top.val, width_avail, child_height_avail)
+		width_avail := parent_width - margin_left - margin_right
+		child_height_avail := height_avail - margin_top - margin_bottom
+
+		// add the "offset", accumulated offset of the previous elements, and the margins this
+		// node sits inside of. Horizontally the margin pushes the node in from the content edge.
+		calculate_layout(child, child_x + margin_left, child_y + offset + margin_top, width_avail, child_height_avail)
 
 		// add the total box sizing of this node to the offset
-		offset += get_layout(child).margin.top.val + child.render.cur_box.h + get_layout(child).margin.bottom.val
+		offset += margin_top + child.render.cur_box.h + margin_bottom
+		count += 1
 	}
 	return offset
 }
@@ -119,7 +152,8 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 	const_width := f32(0) // space that is already taken by children with a fixed width
 	expand_amount := 0
 	for child in n.children {
-		margins := child.style.layout.margin.left.val + child.style.layout.margin.right.val
+		margin := child.style.layout.margin
+		margins := resolve_length(margin.left, parent_width) + resolve_length(margin.right, parent_width)
 		switch child.style.sizing.width.type {
 		case .Absolute:
 			// every fixed child takes up space, not just the last one
@@ -140,10 +174,12 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 	flex_width := expand_amount > 0 ? max(remaining, 0) / f32(expand_amount) : 0
 
 	for child in n.children {
-		margin_left := child.style.layout.margin.left.val
-		margin_right := child.style.layout.margin.right.val
-		margin_top := child.style.layout.margin.top.val
-		margin_bottom := child.style.layout.margin.bottom.val
+		margin := child.style.layout.margin
+		margin_left := resolve_length(margin.left, parent_width)
+		margin_right := resolve_length(margin.right, parent_width)
+		margin_top := resolve_length(margin.top, parent_height)
+		margin_bottom := resolve_length(margin.bottom, parent_height)
+
 		width := f32(0)
 		switch child.style.sizing.width.type {
 		case .Absolute:
@@ -164,7 +200,7 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 			child_x + offset + margin_left,
 			child_y + margin_top,
 			width,
-			parent_height
+			parent_height - margin_top - margin_bottom
 		)
 
 		// add the total box sizing of this node to the offset

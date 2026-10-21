@@ -5,7 +5,7 @@
   </head>
   <body>
     <rect id="root">
-       <rect class="launcherContainer">
+      <rect class="launcherContainer">
         <rect class="appHeader">
           <rect class="headerInner">
             <rect id="search-box">

@@ -1,5 +1,6 @@
 package renderer
 
+import "core:fmt"
 import "core:log"
 import "base:runtime"
 import "core:mem"
@@ -31,6 +32,16 @@ Render_Properties :: struct {
 	fps_cap: 		int
 }
 
+Mouse_Info :: struct {
+	x, y: f32,
+	state: sdl3.MouseButtonFlags
+	// Mousebuttons that are pressed down	
+}
+
+Process_Info :: struct {
+	mouse: Mouse_Info
+}
+
 Renderer :: struct {
 	allocator: 	mem.Allocator,
 	arena: 			mem.Allocator,
@@ -38,6 +49,7 @@ Renderer :: struct {
 
 	sdl: 				SDL_Data,
 	document: 	^oml.Document,
+	process: 		Process_Info,
 	info:				Render_Properties,
 	deltas:     oml.Box
 }
@@ -57,11 +69,10 @@ init :: proc(/* r: ^Renderer */) -> ^Renderer {
 	return r
 }
 
-draw_frame :: proc(r: ^Renderer) {
 
+get_size :: proc(r: ^Renderer) -> (i32, i32) {
+	return i32(r.info.viewport.x), i32(r.info.viewport.y)
 }
-
-
 viewport_size :: #force_inline proc(r: ^Renderer) -> (width, height: f32) {
 	return r.info.viewport.x, r.info.viewport.y
 }
@@ -79,8 +90,49 @@ create_texture :: proc(r: ^Renderer) -> ^sdl3.Texture {
 }
 
 rebuild_texture :: proc(r: ^Renderer) {
-	// tex := r.sdl.texture
-	// r.sdl.texture = create_texture(r)
-	// sdl3.DestroyTexture(tex)
+	tex := r.sdl.texture
+	r.sdl.texture = create_texture(r)
+	sdl3.DestroyTexture(tex)
 	// free(tex)
+}
+
+get_renderer :: proc() {
+
+}
+
+
+init_rend :: proc(r: ^Renderer) {
+	ok := sdl3.Init({.VIDEO})
+	if !ok do panic("Failed to init SDL3")
+
+	r.sdl.window = sdl3.CreateWindow(r.sdl.window_data.name, get_size(r), {.RESIZABLE})
+	// TODO: make these a dedicated function
+	if r.sdl.window == nil do panic(fmt.tprintf("Failed to create window: %s", string(sdl3.GetError())))
+
+	r.sdl.render = sdl3.CreateRenderer(r.sdl.window, nil)
+	if r.sdl.render == nil do panic(fmt.tprintf("Failed to create renderer: %s", string(sdl3.GetError())))
+
+	sdl3.SetRenderLogicalPresentation(r.sdl.render, get_size(r), sdl3.RendererLogicalPresentation.DISABLED)
+	sdl3.RenderPresent(r.sdl.render)
+}
+
+set_window_size :: proc(r: ^Renderer, w,h: f32) {
+	r.info.viewport.x = w
+	r.info.viewport.y = h
+}
+
+draw_screen :: proc(r: ^Renderer) {
+	sdl3.RenderClear(r.sdl.render)
+
+	if r.sdl.texture != nil {
+		w, h := viewport_size(r)
+		dst := sdl3.FRect{0, 0, w, h}
+		sdl3.RenderTexture(r.sdl.render, r.sdl.texture, nil, &dst)
+	}
+
+	sdl3.RenderPresent(r.sdl.render)
+}
+
+clear_screen :: proc(r: ^Renderer) {
+	sdl3.RenderClear(r.sdl.render)
 }
