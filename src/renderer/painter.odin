@@ -11,7 +11,7 @@ build_ops :: proc(n: ^oml.Node) {
 
 	clear(&n.render.ops)
 
-	if !n.style.visible do return
+	// if !n.style.visible do return
 
 	box := n.render.cur_box
 	if box.w <= 0 || box.h <= 0 do return
@@ -52,7 +52,7 @@ calc_opacity :: proc(c: oml.Color, opacity: f32) -> oml.Color {
 calculate_dirty :: proc(r: ^Renderer) {
 	doc := r.document
 
-	if .Layout in doc.tree.render.dirty {
+	if .Layout in doc.body.render.dirty {
 
 	}
 }
@@ -128,7 +128,7 @@ paint :: proc(r: ^Renderer, deltas: oml.Box/* , bg: oml.Color */) {
 	// fill := sdl3.FRect{x0, y0, x1 - x0, y1 - y0}
 	// sdl3.RenderFillRect(r.sdl.render, &fill)
 
-	paint_nodes(r, r.document.tree, deltas)
+	paint_nodes(r, r.document.body, deltas)
 }
 
 intersects :: proc(a, b: oml.Box) -> bool {

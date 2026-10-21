@@ -5,7 +5,300 @@
   </head>
   <body>
     <rect id="root">
-      
+       <rect class="launcherContainer">
+        <rect class="appHeader">
+          <rect class="headerInner">
+            <rect id="search-box">
+              <text class="mutedTextThin">Search players...</text>
+            </rect>
+          </rect>
+        </rect>
+        <rect class="appContainer">
+          <rect class="sidebarContainer">
+            <rect class="sidebarItem">
+              <text class="textSubheader">Home</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Profile</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Friends</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Catalog</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Inventory</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Avatar</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Groups</text>
+            </rect>
+            <rect class="sidebarItem">
+              <text class="textSubheader">Settings</text>
+            </rect>
+
+          </rect>
+          <rect class="scroller">
+            <rect class="appContent">
+              <rect class="welcomeContainer">
+                <rect class="avatarContainer">
+                  
+                </rect>
+                <rect class="avatarDecoContainer">
+                  <rect class="welcomeContents">
+                    <text class="textHeader">Hello, raine!</text>
+                  </rect>
+                  <rect class="friendsListContainer">
+                    <text class="textSubheader">Friends</text>
+                    <rect class="friendsList">
+                      <img id="image-test" class="friendContainer"/>
+                      <rect class="friendContainer"/>
+                      <rect class="friendContainer"/>
+                      <rect class="friendContainer"/>
+                      <rect class="friendContainer"/>
+                    </rect>
+                  </rect>
+                </rect>
+              </rect>
+              
+              <rect class="gamesListContainer">
+                <rect class="gameCategories">
+                  <rect class="gameCategory">
+                    <rect class="categoryNameContainer">
+                      <text class="textSubheader">Popular right now</text>
+                    </rect>
+  
+                    <rect class="gameScroller">
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                    </rect>
+                  </rect>
+  
+                   <rect class="gameCategory">
+                    <rect class="categoryNameContainer">
+                      <text class="textSubheader">Popular right now</text>
+                    </rect>
+  
+                    <rect class="gameScroller">
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                    </rect>
+                  </rect>
+  
+                  <rect class="gameCategory">
+                    <rect class="categoryNameContainer">
+                      <text class="textSubheader">Recently added</text>
+                    </rect>
+  
+                    <rect class="gameScroller">
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                    </rect>
+                  </rect>
+  
+                  <rect class="gameCategory">
+                    <rect class="categoryNameContainer">
+                      <text class="textSubheader">Explore Vortex</text>
+                    </rect>
+  
+                    <rect class="gameScroller">
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                      <rect class="gameContainer">
+                        <rect class="gameIcon" />
+                        <text class="textNormal gameName">
+                          Click For Free Volts
+                        </text>                      
+                      </rect>
+                    </rect>
+                  </rect>
+                </rect>
+              </rect>
+            </rect>
+          </rect>
+        </rect>
+      </rect>
     </rect>
   </body>
 </odin>

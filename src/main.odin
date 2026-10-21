@@ -21,6 +21,8 @@ Document :: struct {
 	file: File,
 	// root of the dom parsed out of the oml file
 	tree: ^Node,
+	body: ^Node,
+	head: ^Node,
 	// loaded_scripts: nil,
 	loaded_styles: [dynamic]^CSS_Stylesheet
 }

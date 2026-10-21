@@ -194,10 +194,10 @@ snapshot :: proc(n: ^oml.Node) {
 // Pass in the renderer because it is cleaner when calling
 // the renderer also contains all the needed information like width and height
 reflow :: proc(r: ^Renderer) {
-	if r == nil || r.document == nil || r.document.tree == nil do return
+	if r == nil || r.document == nil || r.document.body == nil do return
 	fmt.printfln("starting reflow for document")
 
-	root := r.document.tree
+	root := r.document.body
 	w, h := viewport_size(r)
 	root.style.sizing.width = {.Absolute, w}
 	root.style.sizing.height = {.Absolute, h}

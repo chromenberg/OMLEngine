@@ -415,6 +415,15 @@ parse_node :: proc(p: ^OML_Parser, id: xml.Element_ID, parent: ^Node, hook: Node
 
   set_node_attributes(p, node, elem)
 
+  if elem.ident == "body" {
+    p.doc.body = node
+  }
+
+
+  if elem.ident == "head" {
+    p.doc.head = node
+  }
+  
   if hook != nil {
     hook(p, node, elem) // run the node hook if specified, lets other things do tasks when a node is made
   }

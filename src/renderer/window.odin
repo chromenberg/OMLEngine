@@ -42,7 +42,6 @@ draw_screen :: proc(r: ^Renderer) {
 	}
 
 	sdl3.RenderPresent(r.sdl.render)
-	sdl3.RenderClear(r.sdl.render)
 }
 
 clear_screen :: proc(r: ^Renderer) {

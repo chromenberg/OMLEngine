@@ -20,10 +20,10 @@ schedule_repaint :: proc(w: ^renderer.Renderer) {
 schedule_deltas :: proc(r: ^renderer.Renderer) {
 	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
 		d_change := false
-		renderer.get_deltas(r.document.tree, &r.deltas, &d_change)
+		renderer.get_deltas(r.document.body, &r.deltas, &d_change)
 
 		if d_change {
-			renderer.update_dirty(r.document.tree)
+			renderer.update_dirty(r.document.body)
 			renderer.paint(r, r.deltas)
 			r.deltas = {}
 		}
@@ -82,9 +82,9 @@ main :: proc() {
 
 	oml.schedule(&oml_parse, proc(op: ^oml.Event_Op, p: ^oml.OML_Parser) {
 		oml.parse_oml(p)
-		p.doc.tree.render.dirty = {.Layout, .Paint, .Style}
+		p.doc.body.render.dirty = {.Layout, .Paint, .Style}
 		log.logf(.Info, "Successfully parsed OML document and its render-blocking imports.")
-		oml.find_styles(p.doc, p.doc.tree)
+		oml.find_styles(p.doc, p.doc.body)
 	})
 
 	schedule_reflow(r)
@@ -99,7 +99,7 @@ main :: proc() {
 				break mainloop
 			case .WINDOW_RESIZED:
 				log.log(.Debug, "Window has been resized. Need to reflow layout.")
-				renderer.set_window_size(r, f32(e.display.data2), f32(e.display.data2))
+				renderer.set_window_size(r, f32(e.display.data1), f32(e.display.data2))
 				renderer.rebuild_texture(r)
 				schedule_reflow(r)
 			}
