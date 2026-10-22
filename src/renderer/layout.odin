@@ -1,5 +1,6 @@
 package renderer
 
+import "core:log"
 import oml "../"
 
 // TODO: Too many comments, should just remake this but easier to understand and cleaner
@@ -113,6 +114,16 @@ calculate_layout :: proc(n: ^oml.Node, x, y, width_avail, height_avail: f32) {
 	n.render.cur_box.content_h = max(outside_height - inset_v, 0)
 }
 
+margin_x :: proc(n: ^oml.Node, parent_width: f32) -> f32 {
+	return resolve_length(get_layout(n).margin.left, parent_width) +
+				 resolve_length(get_layout(n).margin.right, parent_width)
+}
+margin_y :: proc(n: ^oml.Node, parent_width: f32) -> f32 {
+	return resolve_length(get_layout(n).margin.top, parent_width) +
+				 resolve_length(get_layout(n).margin.bottom, parent_width)
+}
+
+
 // calculates vertically oriented elements, returns the offset caused by the element
 layout_vertical :: proc(n: ^oml.Node, child_x, child_y, parent_width, height_avail: f32) -> f32 {
 	offset := f32(0)
@@ -144,73 +155,166 @@ layout_vertical :: proc(n: ^oml.Node, child_x, child_y, parent_width, height_ava
 	return offset
 }
 
+
+desired_box_size :: proc(n: ^oml.Node, avail: f32) -> f32 {
+	return margin_x(n, avail) + desired_width(n, avail)
+}
+
+// calculates the width a nodes children wants to have their parent set to
+intrinsic_width :: proc(n: ^oml.Node, width_avail: f32) -> f32 {
+	if n == nil {
+		log.logf(.Warning, "Nil node was passed into intrinsic width calculation")
+		return 0
+	}
+
+	inset_x, _ := content_offset(n, width_avail, width_avail)
+
+	// Measure text content and use that as the content variable
+	// TODO: font backend
+	content := f32(0)
+
+	layout := get_layout(n)
+	switch layout.direction {
+	case .Horizontal:
+		for child, i in n.children {
+			if i > 0 do content += layout.gap // TODO: repeated too muh
+			// recurse until tree ends to get needed size
+			content += desired_box_size(child, width_avail)
+		}
+	case .Vertical:
+		for child in n.children {
+			// widest child sets max width
+			content = max(content, desired_box_size(child, width_avail))
+		}
+	}
+	
+	return content + inset_x
+}
+
+desired_width :: proc(n: ^oml.Node, parent_width: f32) -> f32 {
+	switch get_sizing(n).width.type {
+	case .Absolute: return get_sizing(n).width.val
+	case .Percent: return parent_width * (get_sizing(n).width.val / 100)
+	case .Auto: return intrinsic_width(n, parent_width) // set the width to the widths of the children
+	}
+	return 0
+}
+
 // calculates vertically oriented elements returns the offset caused by the element
+// 
+// This function is O(n) per call, however large subtrees can make this O(n^2)
+// Caching implicit width is ideal
 layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_height: f32) -> (max_height: f32) {
-	offset := f32(0)
-	count := 0
+	layout := get_layout(n)
+	gap := layout.gap
 
-	const_width := f32(0) // space that is already taken by children with a fixed width
-	expand_amount := 0
-	for child in n.children {
-		margin := child.style.layout.margin
-		margins := resolve_length(margin.left, parent_width) + resolve_length(margin.right, parent_width)
-		switch child.style.sizing.width.type {
-		case .Absolute:
-			// every fixed child takes up space, not just the last one
-			const_width += child.style.sizing.width.val + margins
-		case .Percent:
-			const_width += parent_width * (child.style.sizing.width.val / 100) + margins
-		case .Auto:
-			expand_amount += 1
-		}
-	}
+	lines := &n.render.lines
+	clear(lines) // clear the lines before recalc
 
-	gap := n.style.layout.gap
-	// a gap only sits *between* children, so there is one less gap than children
-	gap_total := gap * f32(max(len(n.children) - 1, 0))
-	// remaining space is the parent width
-	remaining := parent_width - const_width - gap_total
-	// if the width expanded > 0, divide remaining space by the times it expanded
-	flex_width := expand_amount > 0 ? max(remaining, 0) / f32(expand_amount) : 0
+	first_on_line := 0
+	used := f32(0)
 
-	for child in n.children {
-		margin := child.style.layout.margin
-		margin_left := resolve_length(margin.left, parent_width)
-		margin_right := resolve_length(margin.right, parent_width)
-		margin_top := resolve_length(margin.top, parent_height)
-		margin_bottom := resolve_length(margin.bottom, parent_height)
+	// Calculates when a newline should occur
+	for child, i in n.children {
+		c_lay := get_layout(child)
+		// Width the child wants to have
+		desire := desired_width(child, parent_width) + margin_x(child, parent_width)
 
-		width := f32(0)
-		switch child.style.sizing.width.type {
-		case .Absolute:
-			width = child.style.sizing.width.val
-		case .Percent:
-			width = parent_width * (child.style.sizing.width.val / 100)
-		case .Auto:
-			// subtract the flexbox width by margins
-			width = flex_width - (margin_left + margin_right)
+		//											Total used space, factors gaps
+		if i > first_on_line && (used + gap + desire) > parent_width {
+			line := new(oml.Line)
+
+			line.first = n.children[first_on_line]
+			line.first_i = first_on_line
+
+			line.last = child
+			line.last_i = i-1
+
+			append(lines, oml.Line{
+				first = n.children[first_on_line],
+				first_i = first_on_line,
+				last = child,
+				last_i = i-1
+			})
+			first_on_line = i
+			used = 0 // reset width because of newline
+		} else if i > first_on_line { // if i is not the first line then add gaps
+			used += gap
 		}
 
-		// skip the gap if theres only 1 or less child
-		if count > 0 do offset += gap
-
-		// add the accumulated offset caused by all the parent / sibling elements
-		calculate_layout(
-			child,
-			child_x + offset + margin_left,
-			child_y + margin_top,
-			width,
-			parent_height - margin_top - margin_bottom
-		)
-
-		// add the total box sizing of this node to the offset
-		offset += margin_left + width + margin_right
-		count += 1
-
-		// set the max height the box can have
-		max_height = max(max_height, margin_top + child.render.cur_box.h + margin_bottom)
+		used += desire
 	}
-	return max_height
+
+	append(lines, oml.Line{
+		first = n.children[first_on_line],
+		first_i = first_on_line,
+		last = n.children[len(n.children)-1],
+		last_i = len(n.children)-1
+	})
+
+	offset_y := f32(0)
+
+	// calculates the width of every lines items
+	for line, index in lines {
+		fixed_width := f32(0) // width of the line
+		fillers := 0
+
+		// for every node in the line
+		for i in line.first_i ..= line.last_i {
+			child := n.children[i]
+			// if its "auto" just make it fill the entire line idk
+			if get_sizing(child).width.type == .Auto {
+				fillers += 1
+			} else {
+				fixed_width += desired_width(child, parent_width) + margin_x(child, parent_width)
+			}
+		}
+
+		// how many line gaps so far?
+		gaps := gap * f32(max(line.last_i - line.first_i, 0))
+		remaining := parent_width - fixed_width - gaps
+		filler_width := fillers > 0 ? max(remaining, 0) / f32(fillers) : 0
+
+		offset := f32(0)
+		height := f32(0)
+
+		// for each item index in the line
+		for i in line.first_i ..= line.last_i {
+			child := n.children[i]
+			margin := get_layout(child).margin
+
+			margin_left   := resolve_length(margin.left, parent_width)
+			margin_right  := resolve_length(margin.right, parent_width)
+			margin_top    := resolve_length(margin.top, parent_height)
+			margin_bottom := resolve_length(margin.bottom, parent_height)
+
+			width := desired_width(child, parent_width)
+			if get_sizing(child).width.type ==.Auto {
+				width = max(filler_width - margin_left - margin_right, 0)
+				// set flex grower width to the width per grower minus margins
+				// if its negative set 0 width because negative width is weird
+			}
+
+			if i > line.first_i do offset += gap
+
+			calculate_layout(
+				child,
+				child_x + offset + margin_left,
+				child_y + offset_y + margin_top,
+				width,
+				parent_height - offset_y - margin_top - margin_bottom // remaining height is the line height
+			)
+
+			offset += margin_left + width + margin_right
+			// If height is lower we force the height to be the box size
+			height = max(height, margin_top + child.render.cur_box.h + margin_bottom)
+		}
+
+		offset_y := height // add the height of the line to the offset
+		if index < len(lines) - 1 do offset_y += gap
+	}
+
+	return offset_y
 }
 
 content_horizontal :: proc(s: oml.Sizing_Value, height, inset: f32) -> f32 {
@@ -240,7 +344,7 @@ snapshot :: proc(n: ^oml.Node) {
 // the renderer also contains all the needed information like width and height
 reflow :: proc(r: ^Renderer) {
 	if r == nil || r.document == nil || r.document.body == nil do return
-
+	context.allocator = r.allocator
 	root := r.document.body
 	w, h := viewport_size(r)
 	// root.style.sizing.width = {.Absolute, w}

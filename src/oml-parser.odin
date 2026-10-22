@@ -80,6 +80,19 @@ Box :: struct {
 	content_x, content_y, content_w, content_h: f32
 }
 
+Line :: struct {
+	first_i, last_i: int,
+	first, last: ^Node,
+	fixed_width: f32,
+	grow_nodes: int,
+	height: f32
+}
+
+Computed_Data :: struct {
+	implicit_h, implicit_w: f32,
+	
+}
+
 Render_Info :: struct {
   refs: int,
   // every element made is automatically dirtied to force the renderer to paint it
@@ -87,7 +100,9 @@ Render_Info :: struct {
   dirty: Dirty_Flags,
   ops: [dynamic]Render_Op,
   cur_box: Box,
-  old_box: Box
+  old_box: Box,
+  computed: Computed_Data,
+  lines: [dynamic]Line
 }
 
 Node_Cached :: struct {
