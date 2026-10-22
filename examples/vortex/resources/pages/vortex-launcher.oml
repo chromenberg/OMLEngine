@@ -1,6 +1,7 @@
 <odin>
   <head>
     <link type="style" source="examples/vortex/resources/styles/vortex.ocss" />
+    <link type="style" source="examples/vortex/resources/styles/vortex-games.ocss" />
 
   </head>
   <body>
@@ -51,14 +52,14 @@
                   <rect class="welcomeContents">
                     <text class="textHeader">Hello, raine!</text>
                   </rect>
-                  <rect class="friendsListContainer">
+                  <rect id="friendscontainer" class="friendsListContainer">
                     <text class="textSubheader">Friends</text>
-                    <rect class="friendsList">
-                      <img id="image-test" class="friendContainer"/>
-                      <rect class="friendContainer"/>
-                      <rect class="friendContainer"/>
-                      <rect class="friendContainer"/>
-                      <rect class="friendContainer"/>
+                    <rect id="friends" class="friendsList">
+                      <rect id="friend1" class="friendContainer"/>
+                      <rect id="friend2" class="friendContainer"/>
+                      <rect id="friend3" class="friendContainer"/>
+                      <rect id="friend4" class="friendContainer"/>
+                      <rect id="friend5" class="friendContainer"/>
                     </rect>
                   </rect>
                 </rect>
@@ -67,63 +68,6 @@
               <rect class="gamesListContainer">
                 <rect class="gameCategories">
                   <rect class="gameCategory">
-                    <rect class="categoryNameContainer">
-                      <text class="textSubheader">Popular right now</text>
-                    </rect>
-  
-                    <rect class="gameScroller">
-                      <rect class="gameContainer">
-                        <rect class="gameIcon" />
-                        <text class="textNormal gameName">
-                          Click For Free Volts
-                        </text>                      
-                      </rect>
-                      <rect class="gameContainer">
-                        <rect class="gameIcon" />
-                        <text class="textNormal gameName">
-                          Click For Free Volts
-                        </text>                      
-                      </rect>
-                      <rect class="gameContainer">
-                        <rect class="gameIcon" />
-                        <text class="textNormal gameName">
-                          Click For Free Volts
-                        </text>                      
-                      </rect>
-                      <rect class="gameContainer">
-                        <rect class="gameIcon" />
-                        <text class="textNormal gameName">
-                          Click For Free Volts
-                        </text>                      
-                      </rect>
-                      <rect class="gameContainer">
-                        <rect class="gameIcon" />
-                        <text class="textNormal gameName">
-                          Click For Free Volts
-                        </text>                      
-                      </rect>
-                      <rect class="gameContainer">
-                        <rect class="gameIcon" />
-                        <text class="textNormal gameName">
-                          Click For Free Volts
-                        </text>                      
-                      </rect>
-                      <rect class="gameContainer">
-                        <rect class="gameIcon" />
-                        <text class="textNormal gameName">
-                          Click For Free Volts
-                        </text>                      
-                      </rect>
-                      <rect class="gameContainer">
-                        <rect class="gameIcon" />
-                        <text class="textNormal gameName">
-                          Click For Free Volts
-                        </text>                      
-                      </rect>
-                    </rect>
-                  </rect>
-  
-                   <rect class="gameCategory">
                     <rect class="categoryNameContainer">
                       <text class="textSubheader">Popular right now</text>
                     </rect>

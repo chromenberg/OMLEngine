@@ -161,5 +161,8 @@ update_dirty :: proc(n: ^oml.Node) {
 		build_ops(n)
 		n.render.dirty -= {.Paint}
 	}
+	if .Layout in n.render.dirty {
+		n.render.dirty -= {.Layout} // layout has been calculated
+	}
 	for c in n.children do update_dirty(c)
 }

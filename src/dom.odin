@@ -152,6 +152,24 @@ set_declaration :: proc(n: ^Node, d: ^CSS_Declaration) {
 
 	case "opacity":
 		n.style.opacity = parse_opacity(d.value)
+		
+	case "display":
+		switch d.value {
+		case "flex":
+			n.style.layout.display = .Flex
+		case "none":
+			n.style.layout.display = .None
+		case "block":
+			fallthrough
+		case:
+			n.style.layout.display = .Block		
+		}
+
+	case "flex-wrap":
+		switch d.value {
+		case "true": n.style.layout.flex_wrap = true
+		case:        n.style.layout.flex_wrap = false
+		}
 	}
 }
 

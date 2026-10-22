@@ -1,5 +1,6 @@
 package renderer
 
+import q "core:container/queue"
 import "core:fmt"
 import "core:log"
 import "base:runtime"
@@ -42,6 +43,10 @@ Process_Info :: struct {
 	mouse: Mouse_Info
 }
 
+Render_Task :: struct {
+	
+}
+
 Renderer :: struct {
 	allocator: 	mem.Allocator,
 	arena: 			mem.Allocator,
@@ -51,7 +56,8 @@ Renderer :: struct {
 	document: 	^oml.Document,
 	process: 		Process_Info,
 	info:				Render_Properties,
-	deltas:     oml.Box
+	deltas:     oml.Box,
+	queue:      q.Queue(Render_Task)
 }
 
 init :: proc(/* r: ^Renderer */) -> ^Renderer {

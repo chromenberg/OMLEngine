@@ -1,11 +1,11 @@
 rule (.gamesListContainer) {
-  height: grow;
+  height: 100%;
   direction: column;
 }
 
 rule (.gameCategories) {
   direction: column;
-  gap: 48;
+  gap: 48px;
 }
 
 rule (.gameCategory) {
@@ -19,6 +19,8 @@ rule (.categoryNameContainer) {
 
 rule (.gameScroller) {
   width: grow;
+	display: flex;
+	direction: row;
   gap: 16;
   
 }

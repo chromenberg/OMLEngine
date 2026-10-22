@@ -187,7 +187,7 @@ intrinsic_width :: proc(n: ^oml.Node, width_avail: f32) -> f32 {
 			content = max(content, desired_box_size(child, width_avail))
 		}
 	}
-	
+
 	return content + inset_x
 }
 
@@ -201,7 +201,7 @@ desired_width :: proc(n: ^oml.Node, parent_width: f32) -> f32 {
 }
 
 // calculates vertically oriented elements returns the offset caused by the element
-// 
+//
 // This function is O(n) per call, however large subtrees can make this O(n^2)
 // Caching implicit width is ideal
 layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_height: f32) -> (max_height: f32) {
@@ -211,25 +211,23 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 	lines := &n.render.lines
 	clear(lines) // clear the lines before recalc
 
+	if len(n.children) == 0 do return 0
+
 	first_on_line := 0
 	used := f32(0)
-
 	// Calculates when a newline should occur
 	for child, i in n.children {
 		c_lay := get_layout(child)
-		// Width the child wants to have
-		desire := desired_width(child, parent_width) + margin_x(child, parent_width)
+		reserved := margin_x(child, parent_width)
+		switch get_sizing(child).width.type {
+		case .Absolute: reserved += get_sizing(child).width.val
+		case .Percent:  reserved += parent_width * (get_sizing(child).width.val / 100)
+		case .Auto:
+		}
 
 		//											Total used space, factors gaps
-		if i > first_on_line && (used + gap + desire) > parent_width {
-			line := new(oml.Line)
-
-			line.first = n.children[first_on_line]
-			line.first_i = first_on_line
-
-			line.last = child
-			line.last_i = i-1
-
+		if layout.display == .Flex && layout.flex_wrap &&
+		i > first_on_line && (used + gap + reserved) > parent_width {
 			append(lines, oml.Line{
 				first = n.children[first_on_line],
 				first_i = first_on_line,
@@ -242,7 +240,7 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 			used += gap
 		}
 
-		used += desire
+		used += reserved
 	}
 
 	append(lines, oml.Line{
@@ -265,6 +263,7 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 			// if its "auto" just make it fill the entire line idk
 			if get_sizing(child).width.type == .Auto {
 				fillers += 1
+				fixed_width += margin_x(child, parent_width)
 			} else {
 				fixed_width += desired_width(child, parent_width) + margin_x(child, parent_width)
 			}
@@ -302,7 +301,7 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 				child_x + offset + margin_left,
 				child_y + offset_y + margin_top,
 				width,
-				parent_height - offset_y - margin_top - margin_bottom // remaining height is the line height
+				parent_height - margin_top - margin_bottom
 			)
 
 			offset += margin_left + width + margin_right
@@ -310,7 +309,7 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 			height = max(height, margin_top + child.render.cur_box.h + margin_bottom)
 		}
 
-		offset_y := height // add the height of the line to the offset
+		offset_y += height // add the height of the line to the offset
 		if index < len(lines) - 1 do offset_y += gap
 	}
 
@@ -344,12 +343,19 @@ snapshot :: proc(n: ^oml.Node) {
 // the renderer also contains all the needed information like width and height
 reflow :: proc(r: ^Renderer) {
 	if r == nil || r.document == nil || r.document.body == nil do return
-	context.allocator = r.allocator
+	// context.allocator = r.allocator
 	root := r.document.body
 	w, h := viewport_size(r)
 	// root.style.sizing.width = {.Absolute, w}
 	// root.style.sizing.height = {.Absolute, h}
 
 	snapshot(root)
+	// TODO: Layout invalidation for implicit sizes needs to propagate up the tree to the root
+	// this allows for caching implicit width
 	calculate_layout(root, 0, 0, w, h)
+}
+
+bubble_dirty :: proc(n: ^oml.Node) {
+	node := n
+	for ; node != nil; node = node.parent do node.render.dirty += {.Layout}
 }

@@ -229,6 +229,8 @@ Style_Layout :: struct {
   justify_content: X_Align_Type,
   justify_self: X_Align_Type,
 
+  flex_wrap: bool,
+
   gap: f32
 }
 
@@ -412,6 +414,20 @@ set_node_attributes :: proc(p: ^OML_Parser, node: ^Node, elem: xml.Element) {
 // Runs for every node that is created
 Node_Hook :: proc(p: ^OML_Parser, node: ^Node, elem: xml.Element)
 
+apply_defaults :: proc(p: ^OML_Parser, node: ^Node) {
+	node.style = new(Node_Style, p.allocator)
+	
+  node.style.sizing.width.type = .Auto
+  node.style.sizing.height.type = .Auto
+  node.style.layout.direction = .Vertical
+  node.style.opacity = 1
+  node.style.visible = true
+  node.style.layout.display = .Block
+  node.style.layout.flex_wrap = false
+  
+  node.applied_styles = make(map[string]^Node_Style, p.allocator)	
+}
+
 // DFS parsing
 parse_node :: proc(p: ^OML_Parser, id: xml.Element_ID, parent: ^Node, hook: Node_Hook) -> ^Node {
   p.index = int(id)
@@ -423,14 +439,7 @@ parse_node :: proc(p: ^OML_Parser, id: xml.Element_ID, parent: ^Node, hook: Node
   // keep the raw element name so type selectors (`div`, `text`, ...) can match
   node.tag = strings.clone(elem.ident, p.allocator)
 
-  node.style = new(Node_Style, p.allocator)
-  node.style.sizing.width.type = .Auto
-  node.style.sizing.height.type = .Auto
-  node.style.layout.direction = .Vertical
-  node.style.opacity = 1
-  node.style.visible = true
-  node.applied_styles = make(map[string]^Node_Style, p.allocator)
-
+  apply_defaults(p, node)
   set_node_attributes(p, node, elem)
 
   if elem.ident == "body" {

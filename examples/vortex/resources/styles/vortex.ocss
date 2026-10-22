@@ -12,6 +12,8 @@ rule (#image) {
 rule (.launcherContainer) {
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-wrap: true;
   direction: column;
 }
 
@@ -40,10 +42,11 @@ rule (.mutedTextThin) {
 }
 
 rule (.appContainer) {
-
   height: 100%;
   direction: row;
   padding: 0px 32px 0px 32px;
+	display: flex;
+  flex-wrap: true;
 }
 
 rule (.appContent) {
@@ -114,14 +117,16 @@ rule (.appHeader) {
 }
 
 rule (.friendsListContainer) {
-	width: fit;
+	width: 100%;
   gap: 8px;
-  border-color: #ff0000;
   direction: column;
 }
 
 rule (.friendsList) {
   gap: 12px;
+  width: 100%;
+  display: flex;
+  flex-wrap: true;
   direction: row;
 }
 

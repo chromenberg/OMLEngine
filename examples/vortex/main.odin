@@ -143,8 +143,8 @@ main :: proc() {
 		// Right now reflows and paint changes are only ticked for resizes
 		// However we should check when something is dirty and recalculate that
 		
-		schedule_reflow(r) // Recalculate layout every tick / TODO: Only recalc when needed 
-		schedule_deltas(r) // Recalculate paint every tick / TODO: Only recalc when needed
+		// schedule_reflow(r) // Recalculate layout every tick / TODO: Only recalc when needed 
+		// schedule_deltas(r) // Recalculate paint every tick / TODO: Only recalc when needed
 		oml.tick_loop()
 	}
 }
