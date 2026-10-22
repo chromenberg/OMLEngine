@@ -98,7 +98,7 @@ Render_Info :: struct {
   // every element made is automatically dirtied to force the renderer to paint it
   // then this value is reset
   dirty: Dirty_Flags,
-  ops: [dynamic]Render_Op,
+  ops: [dynamic]^Render_Op,
   cur_box: Box,
   old_box: Box,
   computed: Computed_Data,

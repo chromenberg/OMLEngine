@@ -142,3 +142,31 @@ draw_screen :: proc(r: ^Renderer) {
 clear_screen :: proc(r: ^Renderer) {
 	sdl3.RenderClear(r.sdl.render)
 }
+
+shutdown :: proc(r: ^Renderer) {
+  sdl3.DestroyWindow(r.sdl.window)
+  sdl3.DestroyRenderer(r.sdl.render)
+  sdl3.DestroyTexture(r.sdl.texture)
+  sdl3.Quit()
+  free_all(r.arena)
+  free_all(r.allocator)
+  free_all(r.document.arena)
+  free_all(r.document.allocator)
+  free_all(context.allocator)
+}
+
+event_callback :: proc "c" (func: proc(event: sdl3.Event)) {
+  context = runtime.default_context()
+} 
+
+iter_callback :: proc "c" () { 
+  
+}
+
+init_callback :: proc "c" () {
+  
+}
+
+exit_callback :: proc "c" () {
+  
+}

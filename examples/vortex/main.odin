@@ -59,6 +59,7 @@ clear_now :: proc (r: ^renderer.Renderer) {
 // builds texture -> reflow -> deltas -> repaint -> clear
 full_recalc :: proc(r: ^renderer.Renderer) {
 	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
+  	context.allocator = r.allocator
 		renderer.rebuild_texture(r) // Takes too long when window is large 
 		renderer.reflow(r)
 		
@@ -94,6 +95,7 @@ main :: proc() {
 		}
 	}
 	r := renderer.init()
+	defer renderer.shutdown(r)
 	// doc: oml.Document
 	r.document.file.src = "examples/vortex/resources/pages/vortex-launcher.oml"
 
@@ -101,7 +103,7 @@ main :: proc() {
 	defer oml.close_event_loop()
 
 	oml.init(r.document)
-	defer oml.clean_doc(r.document)
+	defer oml.quit(r.document)
 
 	oml_parse : oml.OML_Parser
 	oml_parse.allocator = r.document.allocator
@@ -128,6 +130,7 @@ main :: proc() {
 			#partial switch e.type {
 			case .QUIT, .WINDOW_CLOSE_REQUESTED, .LOW_MEMORY:
 				log.log(.Debug, "Requested program close")
+				
 				break mainloop
 			case .WINDOW_RESIZED:
 				// clear_now(r)

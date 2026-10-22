@@ -20,27 +20,33 @@ build_ops :: proc(n: ^oml.Node) {
 		color := calc_opacity(n.style.background_color, n.style.opacity)
 		kind := oml.Op_Kind.Rect
 		if n.style.radius > 0 do kind = .Rounded_Rect
-		// the render op needs to be created using the Documents arena allocator
-		// this causes a memory leak for every element that has a render operation created
-		append(&n.render.ops, oml.Render_Op{
+		op := new(oml.Render_Op)
+		op^ = {
 			kind = kind,
 			box = box,
 			radius = n.style.radius,
 			color = n.style.background_color,
-		})
+		}
+		
+		// the render op needs to be created using the Documents arena allocator
+		// this causes a memory leak for every element that has a render operation created
+		append(&n.render.ops, op)
 	}
 
 	if n.style.has_border {
 		color := calc_opacity(n.style.border.color, n.style.opacity)
 		thickness := n.style.border.width.top.val
 		if thickness <= 0 do thickness = 1
-		append(&n.render.ops, oml.Render_Op{
+		op := new(oml.Render_Op, context.allocator)
+		op^ = {
 			kind = .Border,
 			box = box,
 			radius = n.style.radius,
 			thickness = thickness,
 			color = color,
-		})
+		}
+		
+		append(&n.render.ops, op)
 	}
 }
 
@@ -140,7 +146,7 @@ paint_nodes :: proc(r: ^Renderer, n: ^oml.Node, deltas: oml.Box) {
 	for c in n.children do paint_nodes(r, c, deltas)
 }
 
-draw_op :: proc(r: ^Renderer, op: oml.Render_Op) {
+draw_op :: proc(r: ^Renderer, op: ^oml.Render_Op) {
 	rect : sdl3.FRect = {op.box.x, op.box.y, op.box.w, op.box.h}
 
 	#partial switch op.kind {

@@ -75,7 +75,9 @@ init :: proc(doc: ^Document) {
 	doc.arena = mem.dynamic_arena_allocator(doc._arena)
 }
 
-clean_doc :: proc(doc: ^Document) {
+quit :: proc(doc: ^Document) {
 	free_all(doc.arena)
 	free_all(doc.allocator)
+	free_all(context.allocator)
+	free_all(context.temp_allocator)
 }
