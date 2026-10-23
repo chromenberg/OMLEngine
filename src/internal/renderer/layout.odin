@@ -220,14 +220,13 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 		c_lay := get_layout(child)
 		reserved := margin_x(child, parent_width)
 		switch get_sizing(child).width.type {
-		case .Absolute: reserved += get_sizing(child).width.val
-		case .Percent:  reserved += parent_width * (get_sizing(child).width.val / 100)
-		case .Auto:
+			case .Absolute: reserved += get_sizing(child).width.val
+			case .Percent:  reserved += parent_width * (get_sizing(child).width.val / 100)
+			case .Auto:
 		}
 
 		//											Total used space, factors gaps
-		if layout.display == .Flex && layout.flex_wrap &&
-		i > first_on_line && (used + gap + reserved) > parent_width {
+		if layout.display == .Flex && layout.flex_wrap && i > first_on_line && (used + gap + reserved) > parent_width {
 			append(lines, oml.Line{
 				first = n.children[first_on_line],
 				first_i = first_on_line,

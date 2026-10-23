@@ -1,4 +1,4 @@
-package oml
+package internal
 
 import "core:log"
 import "core:os"

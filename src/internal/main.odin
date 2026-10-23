@@ -1,4 +1,4 @@
-package oml
+package internal
 
 import "base:runtime"
 import "core:log"
@@ -24,7 +24,8 @@ Document :: struct {
 	body: ^Node,
 	head: ^Node,
 	// loaded_scripts: nil,
-	loaded_styles: [dynamic]^CSS_Stylesheet
+	loaded_styles: [dynamic]^CSS_Stylesheet,
+	parser: ^OML_Parser // currently only allows for 1 parser
 }
 
 File :: struct {
@@ -51,9 +52,7 @@ Op_Kind :: enum {
 	Circle,
 }
 
-Color :: struct {
-	r,g,b,a: f32
-}
+Color :: distinct [4]f32
 
 Render_Op :: struct {
 	kind: Op_Kind,
@@ -64,20 +63,3 @@ Render_Op :: struct {
 	opacity: f32,
 }
 
-init :: proc(doc: ^Document) {
-	// context.logger = log.create_console_logger()
-	doc.allocator = runtime.heap_allocator()
-	doc._arena = new(mem.Dynamic_Arena, doc.allocator)
-	doc._arena.block_allocator = doc.allocator
-	doc._arena.block_size = 1024
-
-	mem.dynamic_arena_init(doc._arena, doc.allocator, doc.allocator)
-	doc.arena = mem.dynamic_arena_allocator(doc._arena)
-}
-
-quit :: proc(doc: ^Document) {
-	free_all(doc.arena)
-	free_all(doc.allocator)
-	free_all(context.allocator)
-	free_all(context.temp_allocator)
-}

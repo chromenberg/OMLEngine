@@ -36,7 +36,7 @@ Render_Properties :: struct {
 Mouse_Info :: struct {
 	x, y: f32,
 	state: sdl3.MouseButtonFlags
-	// Mousebuttons that are pressed down	
+	// Mousebuttons that are pressed down
 }
 
 Process_Info :: struct {
@@ -44,7 +44,11 @@ Process_Info :: struct {
 }
 
 Render_Task :: struct {
-	
+
+}
+
+Pending_States :: struct {
+	reflow, repaint: bool
 }
 
 Renderer :: struct {
@@ -57,16 +61,17 @@ Renderer :: struct {
 	process: 		Process_Info,
 	info:				Render_Properties,
 	deltas:     oml.Box,
-	queue:      q.Queue(Render_Task)
+	queue:      q.Queue(Render_Task),
+	pending:    Pending_States
 }
 
-init :: proc(/* r: ^Renderer */) -> ^Renderer {
+init :: proc() -> ^Renderer {
 	log.logf(.Debug, "Initializing renderer")
 	r := new(Renderer)
 	set_window_size(r, 640, 480)
-	
-	r.allocator = runtime.heap_allocator()
-	r.document = new(oml.Document)
+
+	r.allocator = runtime.heap_allocator() // doesnt have free_all
+	// r.document = oml.create_document()
 	// mem.dynamic_arena_init(r._arena, r.allocator, r.allocator)
 	// r.arena = mem.dynamic_arena_allocator(r._arena)
 	log.logf(.Debug, "Size, %f, %f", viewport_size(r))
@@ -118,7 +123,7 @@ init_rend :: proc(r: ^Renderer) {
 	r.sdl.render = sdl3.CreateRenderer(r.sdl.window, nil)
 	if r.sdl.render == nil do panic(fmt.tprintf("Failed to create renderer: %s", string(sdl3.GetError())))
 
-	sdl3.SetRenderLogicalPresentation(r.sdl.render, get_size(r), sdl3.RendererLogicalPresentation.DISABLED)
+	// sdl3.SetRenderLogicalPresentation(r.sdl.render, get_size(r), sdl3.RendererLogicalPresentation.OVERSCAN)
 	sdl3.RenderPresent(r.sdl.render)
 }
 
@@ -148,25 +153,25 @@ shutdown :: proc(r: ^Renderer) {
   sdl3.DestroyRenderer(r.sdl.render)
   sdl3.DestroyTexture(r.sdl.texture)
   sdl3.Quit()
-  free_all(r.arena)
-  free_all(r.allocator)
-  free_all(r.document.arena)
-  free_all(r.document.allocator)
+  
+  free(r.document)
+  free(r)
+  free_all(context.temp_allocator)
   free_all(context.allocator)
 }
 
 event_callback :: proc "c" (func: proc(event: sdl3.Event)) {
   context = runtime.default_context()
-} 
+}
 
-iter_callback :: proc "c" () { 
-  
+iter_callback :: proc "c" () {
+
 }
 
 init_callback :: proc "c" () {
-  
+
 }
 
 exit_callback :: proc "c" () {
-  
+
 }

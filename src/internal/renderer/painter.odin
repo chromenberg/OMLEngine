@@ -6,11 +6,12 @@ import oml "../"
 
 
 
+// Every time this is ran an allocation is made so we
+// MUST make sure nothing is leaked
 build_ops :: proc(n: ^oml.Node) {
 	if n == nil do return
 
-	clear(&n.render.ops)
-
+	clear(&n.render.ops) // removes everything
 	// if !n.style.visible do return
 
 	box := n.render.cur_box
@@ -18,35 +19,30 @@ build_ops :: proc(n: ^oml.Node) {
 
 	if n.style.has_bg {
 		color := calc_opacity(n.style.background_color, n.style.opacity)
-		kind := oml.Op_Kind.Rect
+		kind: oml.Op_Kind = .Rect
 		if n.style.radius > 0 do kind = .Rounded_Rect
-		op := new(oml.Render_Op)
-		op^ = {
+		// the render op needs to be created using the Documents arena allocator
+		// this causes a memory leak for every element that has a render operation created
+		append(&n.render.ops, oml.Render_Op{
 			kind = kind,
 			box = box,
 			radius = n.style.radius,
 			color = n.style.background_color,
-		}
-		
-		// the render op needs to be created using the Documents arena allocator
-		// this causes a memory leak for every element that has a render operation created
-		append(&n.render.ops, op)
+		})
 	}
 
 	if n.style.has_border {
 		color := calc_opacity(n.style.border.color, n.style.opacity)
 		thickness := n.style.border.width.top.val
 		if thickness <= 0 do thickness = 1
-		op := new(oml.Render_Op, context.allocator)
-		op^ = {
+
+		append(&n.render.ops, oml.Render_Op{
 			kind = .Border,
 			box = box,
 			radius = n.style.radius,
 			thickness = thickness,
 			color = color,
-		}
-		
-		append(&n.render.ops, op)
+		})
 	}
 }
 
@@ -146,7 +142,7 @@ paint_nodes :: proc(r: ^Renderer, n: ^oml.Node, deltas: oml.Box) {
 	for c in n.children do paint_nodes(r, c, deltas)
 }
 
-draw_op :: proc(r: ^Renderer, op: ^oml.Render_Op) {
+draw_op :: proc(r: ^Renderer, op: oml.Render_Op) {
 	rect : sdl3.FRect = {op.box.x, op.box.y, op.box.w, op.box.h}
 
 	#partial switch op.kind {
@@ -160,6 +156,8 @@ draw_op :: proc(r: ^Renderer, op: ^oml.Render_Op) {
 }
 
 // Repaint and Reflow are linked for some reason, a reflow also causes a repaint (in most occasions) but a repaint cannot cause a reflow
+//
+// This updates the nodes children aswell
 update_dirty :: proc(n: ^oml.Node) {
 	if n == nil do return
 

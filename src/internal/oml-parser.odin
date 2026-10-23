@@ -1,4 +1,4 @@
-package oml
+package internal
 
 import "core:log"
 import "core:mem"
@@ -75,8 +75,10 @@ Dirty_Type :: enum {
 
 Dirty_Flags :: bit_set[Dirty_Type]
 
+Position :: distinct[4]f32
+
 Box :: struct {
-	x,y,w,h: f32,
+	x,y,w,h: f32, // TODO: replace with array
 	content_x, content_y, content_w, content_h: f32
 }
 
@@ -90,7 +92,7 @@ Line :: struct {
 
 Computed_Data :: struct {
 	implicit_h, implicit_w: f32,
-	
+
 }
 
 Render_Info :: struct {
@@ -98,7 +100,7 @@ Render_Info :: struct {
   // every element made is automatically dirtied to force the renderer to paint it
   // then this value is reset
   dirty: Dirty_Flags,
-  ops: [dynamic]^Render_Op,
+  ops: [dynamic]Render_Op,
   cur_box: Box,
   old_box: Box,
   computed: Computed_Data,
@@ -416,7 +418,7 @@ Node_Hook :: proc(p: ^OML_Parser, node: ^Node, elem: xml.Element)
 
 apply_defaults :: proc(p: ^OML_Parser, node: ^Node) {
 	node.style = new(Node_Style, p.allocator)
-	
+
   node.style.sizing.width.type = .Auto
   node.style.sizing.height.type = .Auto
   node.style.layout.direction = .Vertical
@@ -424,8 +426,8 @@ apply_defaults :: proc(p: ^OML_Parser, node: ^Node) {
   node.style.visible = true
   node.style.layout.display = .Block
   node.style.layout.flex_wrap = false
-  
-  node.applied_styles = make(map[string]^Node_Style, p.allocator)	
+
+  node.applied_styles = make(map[string]^Node_Style, p.allocator)
 }
 
 // DFS parsing
@@ -438,7 +440,9 @@ parse_node :: proc(p: ^OML_Parser, id: xml.Element_ID, parent: ^Node, hook: Node
   node.parent = parent
   // keep the raw element name so type selectors (`div`, `text`, ...) can match
   node.tag = strings.clone(elem.ident, p.allocator)
-
+  node.render.ops = make([dynamic]Render_Op)
+  node.render.lines = make([dynamic]Line)
+  
   apply_defaults(p, node)
   set_node_attributes(p, node, elem)
 
@@ -505,4 +509,23 @@ parse_oml :: proc(p: ^OML_Parser, hook: Node_Hook = nil) {
 	p.xdoc = nil
 	log.infof("tree %#v", p.doc.tree.derived)
 	log.infof("styles %#v", p.doc.loaded_styles[:])
+}
+
+// Assigns this parser to the passed in document automatically
+create_parser :: proc(d: ^Document) -> ^OML_Parser {
+	p := new(OML_Parser)
+	p.style_queue = make([dynamic]string)
+	p.allocator = d.allocator
+	p.arena = d.arena
+	p.doc = d
+	p.file = d.file
+
+	d.parser = p
+	
+	return p
+}
+
+destroy_parser :: proc(p: ^OML_Parser) {
+	delete(p.style_queue)
+	free(p)
 }

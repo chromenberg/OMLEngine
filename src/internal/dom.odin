@@ -1,4 +1,4 @@
-package oml
+package internal
 
 import "core:strconv"
 import "core:strings"
@@ -152,7 +152,7 @@ set_declaration :: proc(n: ^Node, d: ^CSS_Declaration) {
 
 	case "opacity":
 		n.style.opacity = parse_opacity(d.value)
-		
+
 	case "display":
 		switch d.value {
 		case "flex":
@@ -162,7 +162,7 @@ set_declaration :: proc(n: ^Node, d: ^CSS_Declaration) {
 		case "block":
 			fallthrough
 		case:
-			n.style.layout.display = .Block		
+			n.style.layout.display = .Block
 		}
 
 	case "flex-wrap":

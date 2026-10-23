@@ -1,80 +1,11 @@
 package main
 
-import "vendor:sdl3"
-import "core:time"
-import "core:nbio"
 import "core:log"
 import "core:mem"
 import "core:fmt"
 import oml "../../src"
-import "../../src/renderer"
+import rend "../../src/internal/renderer"
 
-schedule_repaint :: proc(w: ^renderer.Renderer) {
-	oml.schedule(w, proc(op: ^oml.Event_Op, w: ^renderer.Renderer) {
-		log.logf(.Debug, "Drawing")
-
-		renderer.paint(w, w.deltas)
-		w.deltas = {}
-	})
-}
-schedule_deltas :: proc(r: ^renderer.Renderer) {
-	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
-		d_change := false
-		renderer.get_deltas(r.document.body, &r.deltas, &d_change)
-
-		if d_change {
-			renderer.update_dirty(r.document.body)
-			renderer.paint(r, r.deltas)
-			r.deltas = {}
-		}
-
-		draw_now(r)
-	})
-}
-schedule_reflow :: proc (r: ^renderer.Renderer) {
-	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
-		renderer.reflow(r)
-	})
-}
-
-schedule_draw :: proc (r: ^renderer.Renderer) {
-	oml.timeout(16_000_000, r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
-		renderer.draw_screen(r)
-		schedule_draw(r)
-	})
-}
-
-draw_now :: proc (r: ^renderer.Renderer) {
-	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
-		renderer.draw_screen(r)
-	})
-}
-clear_now :: proc (r: ^renderer.Renderer) {
-	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
-		renderer.clear_screen(r)
-	})
-}
-
-// Sequentially recalculates everything, 
-// builds texture -> reflow -> deltas -> repaint -> clear
-full_recalc :: proc(r: ^renderer.Renderer) {
-	oml.schedule(r, proc(op: ^oml.Event_Op, r: ^renderer.Renderer) {
-  	context.allocator = r.allocator
-		renderer.rebuild_texture(r) // Takes too long when window is large 
-		renderer.reflow(r)
-		
-		d_change := false
-		renderer.get_deltas(r.document.body, &r.deltas, &d_change)
-
-		if d_change {
-			renderer.update_dirty(r.document.body)
-			renderer.paint(r, r.deltas)
-			r.deltas = {}
-		}
-		
-		renderer.draw_screen(r)
-	})
-}
 main :: proc() {
 	context.logger = log.create_console_logger(.Debug)
 	when ODIN_DEBUG {
@@ -94,60 +25,25 @@ main :: proc() {
 			mem.tracking_allocator_destroy(&track)
 		}
 	}
-	r := renderer.init()
-	defer renderer.shutdown(r)
-	// doc: oml.Document
-	r.document.file.src = "examples/vortex/resources/pages/vortex-launcher.oml"
 
+	r := rend.init()
+	defer rend.shutdown(r)
+
+	doc := oml.create_document()
+	oml.init(doc)
+	r.document = doc
+	defer oml.cleanup(doc)
+	
+	doc.file.src = "examples/vortex/resources/pages/vortex-launcher.oml"
 	oml.start_event_loop()
 	defer oml.close_event_loop()
 
-	oml.init(r.document)
-	defer oml.quit(r.document)
+	oml.create_parser(doc)
+	oml.load(doc)
 
-	oml_parse : oml.OML_Parser
-	oml_parse.allocator = r.document.allocator
-	oml_parse.arena = r.document.arena
-	oml_parse.doc = r.document
-	oml_parse.file = r.document.file
+	oml.schedule_reflow(r)
+	oml.schedule_repaint(r)
+	oml.draw_loop(r) // this starts a loop
 
-
-	oml.schedule(&oml_parse, proc(op: ^oml.Event_Op, p: ^oml.OML_Parser) {
-		oml.parse_oml(p)
-		p.doc.body.render.dirty = {.Layout, .Paint, .Style}
-		log.logf(.Info, "Successfully parsed OML document and its render-blocking imports.")
-		oml.find_styles(p.doc, p.doc.body)
-	})
-
-	schedule_reflow(r)
-	schedule_deltas(r)
-	schedule_draw(r) // this starts a loop
-
-	mainloop: for {
-		// clear_now(r)
-		
-		for e: sdl3.Event; sdl3.PollEvent(&e); {
-			#partial switch e.type {
-			case .QUIT, .WINDOW_CLOSE_REQUESTED, .LOW_MEMORY:
-				log.log(.Debug, "Requested program close")
-				
-				break mainloop
-			case .WINDOW_RESIZED:
-				// clear_now(r)
-				log.logf(.Info, "Window has been resized. Recalculating layout.")
-				renderer.set_window_size(r, f32(e.display.data1), f32(e.display.data2))
-				full_recalc(r)
-			case .MOUSE_MOTION:
-				// This just runs (getmousepos), even though this event passes out the data of the mouse move
-				renderer.update_mouse(r)	
-			}
-		}
-
-		// Right now reflows and paint changes are only ticked for resizes
-		// However we should check when something is dirty and recalculate that
-		
-		// schedule_reflow(r) // Recalculate layout every tick / TODO: Only recalc when needed 
-		// schedule_deltas(r) // Recalculate paint every tick / TODO: Only recalc when needed
-		oml.tick_loop()
-	}
+	oml.loop(r)
 }
