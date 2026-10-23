@@ -135,6 +135,7 @@ set_declaration :: proc(n: ^Node, d: ^CSS_Declaration) {
 	case "background-color":
 		n.style.has_bg = true
 		n.style.background_color = parse_color(d.value)
+		n.style.color = n.style.background_color
 
 	case "color":
 		n.style.color = parse_color(d.value)

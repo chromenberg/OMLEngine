@@ -80,6 +80,8 @@ calculate_layout :: proc(n: ^oml.Node, x, y, width_avail, height_avail: f32) {
 	// calc the width using the width and how much space is left
 	node_w := max(calculate_size(n.style.sizing.width, width_avail), 0)
 	content_w := max(node_w - inset_h, 0)
+	
+	clip(n, x, width_avail, n.parent.render.cur_box.x, n.parent.render.cur_box.w)
 
 	// update the nodes bounds
 	n.render.cur_box.x = x
@@ -105,13 +107,21 @@ calculate_layout :: proc(n: ^oml.Node, x, y, width_avail, height_avail: f32) {
 	switch n.style.layout.direction {
 	case .Vertical:
 		content_h = layout_vertical(n, content_x, content_y, content_w, inner_h)
+		
 	case .Horizontal:
 		content_h = layout_horizontal(n, content_x, content_y, content_w, inner_h)
+		
 	}
+
+	// if n.render.cur_box.over_w != 0 {
+	// 	n.render.cur_box.w = n.render.cur_box.over_w
+	// }
+	
 
 	outside_height := max(calculate_height(n.style.sizing.height, content_h + inset_v, height_avail), 0)
 	n.render.cur_box.h = outside_height
 	n.render.cur_box.content_h = max(outside_height - inset_v, 0)
+	// compute_clip(n, &n.render.cur_box, &n.parent.render.cur_box)
 }
 
 margin_x :: proc(n: ^oml.Node, parent_width: f32) -> f32 {
@@ -292,7 +302,7 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 				// set flex grower width to the width per grower minus margins
 				// if its negative set 0 width because negative width is weird
 			}
-
+			// clip(n, child_x, used, n.parent.render.cur_box.x, n.parent.render.cur_box.w)
 			if i > line.first_i do offset += gap
 
 			calculate_layout(
@@ -303,9 +313,12 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 				parent_height - margin_top - margin_bottom
 			)
 
+			
 			offset += margin_left + width + margin_right
 			// If height is lower we force the height to be the box size
 			height = max(height, margin_top + child.render.cur_box.h + margin_bottom)
+			
+			// compute_clip(child, child_x, child_y, width, height, parent_width, parent_height - margin_bottom - margin_top)
 		}
 
 		offset_y += height // add the height of the line to the offset
@@ -315,12 +328,13 @@ layout_horizontal :: proc(n: ^oml.Node, child_x, child_y, parent_width, parent_h
 	return offset_y
 }
 
+// Calculates horizontal scaling based from size type
+@(private="file")
 content_horizontal :: proc(s: oml.Sizing_Value, height, inset: f32) -> f32 {
 	switch s.type {
 	case .Absolute:
-		return max(s.val - inset, 0) // if the heiht would end up less than the inset then just return 0
+		return max(s.val - inset, 0)
 	case .Percent:
-		// divide theheight by the percent and then subtract inset
 		return max(height * (s.val / 100) - inset, 0)
 	case .Auto:
 		return max(height - inset, 0)
@@ -328,26 +342,64 @@ content_horizontal :: proc(s: oml.Sizing_Value, height, inset: f32) -> f32 {
 	return 0
 }
 
+// Computes a nodes clipping based off of its position and width relative to its parents size
+// 
+// `n` - The node that is being clipped,
+// `x` - The x position of the node we are clipping
+// `y` - The y position of the node we are clipping
+// `w` - The width of the node we are clipping
+// `h` - The height of the node we are clipping
+// 
+// `p_width` - the width of the parent to compare to
+// `p_height` - the height of the parent to compare to
+compute_clip :: proc(n: ^oml.Node, ch, pa: ^oml.Box) {
+	// right side coord of node
+	// 
+	// x is coord on the screen
+	// we need to get the coord on the 
+	if ch.x + ch.w > pa.x + pa.w {
+		log.logf(.Debug, "Clipping occurred")
+		ch.w = diff_right(ch.x, ch.w, 0, pa.w)
+	}
+}
+clip :: proc(n: ^oml.Node, x,w,px,pw: f32) {
+	n.style.background_color = n.style.color
+		n.render.dirty += {.Paint}
+	
+	if x+w > px+pw {
+		log.logf(.Debug, "Clipping occurred")
+		n.render.cur_box.w = diff_right(x, w, px, pw)
+		n.style.background_color = {180, 30, 20, 255}
+		n.style.has_bg = true
+	}
+	
+}
+diff_right :: proc(x0, w0, x1, w1: f32) -> f32 {
+	diff := (x0+w0) - ((x0+w0)-(x1+w1))
+	if diff < 0 {
+		log.logf(.Warning, "Calculated a clipped width that resulted in a negative width (%f)", diff)
+	}
+
+	return max(diff, 0)
+}
+
+compute_scroll :: proc() {
+	
+}
+
 // saves the state of the elements before layout changes occur
-//
-// used for seeing if the element should be rerendered
 snapshot :: proc(n: ^oml.Node) {
 	if n == nil do return
-	// set the old box to the current box as the current will be changing this reflow
 	n.render.old_box = n.render.cur_box
 	for child in n.children do snapshot(child)
 }
 
-// Pass in the renderer because it is cleaner when calling
-// the renderer also contains all the needed information like width and height
+
 reflow :: proc(r: ^Renderer) {
 	if r == nil || r.document == nil || r.document.body == nil do return
-	// context.allocator = r.allocator
+	
 	root := r.document.body
 	w, h := viewport_size(r)
-	// root.style.sizing.width = {.Absolute, w}
-	// root.style.sizing.height = {.Absolute, h}
-
 	snapshot(root)
 	// TODO: Layout invalidation for implicit sizes needs to propagate up the tree to the root
 	// this allows for caching implicit width

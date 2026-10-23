@@ -1,3 +1,6 @@
+rule (rect) {
+	border-color: #1e1e1eff;
+}
 rule (#root) {
   width: 100%;
   height: 100%;

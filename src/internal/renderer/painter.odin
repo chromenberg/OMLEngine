@@ -15,14 +15,18 @@ build_ops :: proc(n: ^oml.Node) {
 	// if !n.style.visible do return
 
 	box := n.render.cur_box
+	if box.over_w != 0 {
+		box.w = box.over_w
+	}
 	if box.w <= 0 || box.h <= 0 do return
 
 	if n.style.has_bg {
 		color := calc_opacity(n.style.background_color, n.style.opacity)
 		kind: oml.Op_Kind = .Rect
 		if n.style.radius > 0 do kind = .Rounded_Rect
-		// the render op needs to be created using the Documents arena allocator
-		// this causes a memory leak for every element that has a render operation created
+
+		
+		
 		append(&n.render.ops, oml.Render_Op{
 			kind = kind,
 			box = box,
@@ -77,9 +81,11 @@ get_deltas :: proc(n: ^oml.Node, b: ^oml.Box, deltas_changed: ^bool) {
 		n.render.old_box = n.render.cur_box // consume this change
 	}
 	if .Paint in n.render.dirty {
+		// clip_node(&n.render.cur_box, &n.parent.render.cur_box)
 		set_deltas(b, n.render.cur_box)
 		deltas_changed^ = true
 	}
+	
 
 	for c in n.children do get_deltas(c, b, deltas_changed)
 }
@@ -110,10 +116,11 @@ paint :: proc(r: ^Renderer, deltas: oml.Box) {
 
 	w, h := viewport_size(r)
 
-	x0 := max(deltas.x, 0)
-	y0 := max(deltas.y, 0)
-	x1 := min(deltas.x + deltas.w, w)
-	y1 := min(deltas.y + deltas.h, h)
+	x0 := max(deltas.x, 0)						// left
+	y0 := max(deltas.y, 0)					  // bottom
+	x1 := min(deltas.x + deltas.w, w) // right
+	y1 := min(deltas.y + deltas.h, h) // top
+	
 	if x1 <= x0 || y1 <= y0 do return // nothing to paint
 
 	// set sdl3 to target rendering to that specific texture and reset at the end
@@ -132,6 +139,14 @@ paint :: proc(r: ^Renderer, deltas: oml.Box) {
 intersects :: proc(a, b: oml.Box) -> bool {
 	return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
 }
+
+clip_node :: proc(child, parent: ^oml.Box) {
+	if child.x + child.w > parent.w {
+		// if right side of a is past right side of b
+		child.w = (child.x+child.w)-((child.x+child.w) - (parent.x+parent.w))
+	}
+}
+
 
 paint_nodes :: proc(r: ^Renderer, n: ^oml.Node, deltas: oml.Box) {
 	if n == nil do return

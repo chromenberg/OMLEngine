@@ -78,7 +78,8 @@ Dirty_Flags :: bit_set[Dirty_Type]
 Position :: distinct[4]f32
 
 Box :: struct {
-	x,y,w,h: f32, // TODO: replace with array
+	x,         y,         w,         h, // TODO: replace with array
+	over_x,    over_y,    over_w,    over_h,
 	content_x, content_y, content_w, content_h: f32
 }
 
@@ -442,7 +443,7 @@ parse_node :: proc(p: ^OML_Parser, id: xml.Element_ID, parent: ^Node, hook: Node
   node.tag = strings.clone(elem.ident, p.allocator)
   node.render.ops = make([dynamic]Render_Op)
   node.render.lines = make([dynamic]Line)
-  
+
   apply_defaults(p, node)
   set_node_attributes(p, node, elem)
 
@@ -521,7 +522,7 @@ create_parser :: proc(d: ^Document) -> ^OML_Parser {
 	p.file = d.file
 
 	d.parser = p
-	
+
 	return p
 }
 
